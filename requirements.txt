@@ -3,3 +3,5 @@ pypdf
 openai
 reportlab
 streamlit-pdf-viewer
+pdf2image
+pillow
