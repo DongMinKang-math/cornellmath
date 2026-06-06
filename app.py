@@ -4,20 +4,19 @@ from openai import OpenAI
 import json
 import io
 import os
-import base64
 
-# PDF 생성을 위한 부품 임포트
+# PDF 생성 및 새로운 뷰어 라이브러리 임포트
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from streamlit_pdf_viewer import pdf_viewer
 
 # 웹 페이지 설정 (브라우저 탭 아이콘을 📊 모양으로 고정)
 st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", page_icon="📊", layout="centered")
 
-# 타이틀 설정
 st.title("📊 코넬수학전문학원 레벨테스트 결과지 시스템")
 st.caption("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
 st.markdown("---")
@@ -73,11 +72,11 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # [유실 방지 전면 수정] 표들의 가로 길이를 안전하게 변수로 선언하여 코드 잘림 현상을 완벽 차단
-    width_table_info = [60, 110, 60, 110, 60, 110]
-    width_table_chapters = [360, 150]
-    width_table_difficulty = [100, 100, 310]
-    width_table_comment = [510]
+    # [유실 방지] 가로폭 너비 숫자를 변수 배열로 감싸서 문자열이 짤리지 않도록 보호 조치
+    w_info = [65, 105, 65, 105, 65, 105]
+    w_ch = [360, 150]
+    w_diff = [100, 90, 320]
+    w_comment = [510]
     
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_center), Paragraph(data.get('student_name', ''), body_style),
@@ -88,7 +87,7 @@ def create_academy_report(data):
          Paragraph('', body_style), Paragraph('', body_style)]
     ]
     
-    t_info = Table(info_data, colWidths=width_table_info)
+    t_info = Table(info_data, colWidths=w_info)
     t_info.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,1), colors.HexColor('#F1F5F9')),
         ('BACKGROUND', (2,0), (2,1), colors.HexColor('#F1F5F9')),
@@ -110,7 +109,7 @@ def create_academy_report(data):
     for ch in data.get("chapters", []):
         ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(f"{ch['achievement']}%", body_center)])
         
-    t_ch = Table(ch_rows, colWidths=width_table_chapters)
+    t_ch = Table(ch_rows, colWidths=w_ch)
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
@@ -130,7 +129,7 @@ def create_academy_report(data):
         [Paragraph('중', body_style), Paragraph(f"{st_diff.get('중', '0')}%", body_center), Paragraph('응용 문제 및 핵심 유형 적용력 진단', body_style)],
         [Paragraph('하', body_style), Paragraph(f"{st_diff.get('하', '0')}%", body_center), Paragraph('기본 개념 및 기초 계산 능력 진단', body_style)]
     ]
-    t_diff = Table(diff_data, colWidths=width_table_difficulty)
+    t_diff = Table(diff_data, colWidths=w_diff)
     t_diff.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (2,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
@@ -145,7 +144,7 @@ def create_academy_report(data):
     story.append(Spacer(1, 6))
     
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
-    t_comment = Table(comment_box, colWidths=width_table_comment)
+    t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
@@ -261,9 +260,8 @@ if uploaded_file is not None:
             st.markdown("---")
             st.subheader("👀 결과지 실시간 미리보기")
             
-            base64_pdf = base64.b64encode(pdf_data.getvalue()).decode('utf-8')
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" style="border:1px solid #CBD5E1; border-radius:8px;"></iframe>'
-            st.markdown(pdf_display, unsafe_allow_html=True)
+            # 크롬 차단을 우회하여 이진 데이터를 컴포넌트에 할당
+            pdf_viewer(input=pdf_data.getvalue(), width=700)
             
             st.markdown("---")
             st.subheader("🖨️ 최종 결과지 인쇄 발행")
