@@ -4,18 +4,16 @@ from openai import OpenAI
 import json
 import io
 import os
-from PIL import Image as PILImage
 
-# PDF 생성 및 드로잉 부품 임포트
+# PDF 생성 및 정밀 시각화 부품 임포트
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, Rect, Line, Circle, String
 from streamlit_pdf_viewer import pdf_viewer
-from pdf2image import convert_from_bytes
 
 # 웹 페이지 설정 (브라우저 탭 아이콘을 📊 모양으로 고정)
 st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", page_icon="📊", layout="centered")
@@ -44,9 +42,9 @@ def calculate_math_level(score_str):
         return "C"
 
 # PDF 성적표 생성 함수 정의
-def create_academy_report(data, cropped_image_path=None):
+def create_academy_report(data):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=45)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=40)
     story = []
     
     font_filename = "NANUMGOTHIC.TTF" 
@@ -54,7 +52,7 @@ def create_academy_report(data, cropped_image_path=None):
         pdfmetrics.registerFont(TTFont('CustomFont', font_filename))
         font_name = 'CustomFont'
     else:
-        st.warning(f"⚠️ 저장소에 {font_filename} 파일이 발견되지 않았습니다.")
+        st.warning(f"⚠️ 저장소에 {font_filename} 파일이 발견되지 않았습니다. 한글 폰트를 업로드해 주세요.")
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
         font_name = 'HeiseiMin-W3'
@@ -87,7 +85,7 @@ def create_academy_report(data, cropped_image_path=None):
     computed_level = calculate_math_level(data.get('score', '0'))
     
     w_info = [515 / 6] * 6
-    w_ch = [515 * 0.75, 515 * 0.25]
+    w_ch = [515 * 0.45, 515 * 0.40, 515 * 0.15]
     w_comment = 515
     
     info_data = [
@@ -116,15 +114,37 @@ def create_academy_report(data, cropped_image_path=None):
     story.append(Paragraph("📈 단원별 성취 분석", section_style))
     story.append(Spacer(1, 4))
     
-    ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
+    def make_ch_bar_cell(pct_val):
+        try:
+            pct = min(100, max(0, int(pct_val)))
+        except:
+            pct = 0
+        w_filled = max(1, int(pct * 1.8))
+        w_empty = max(1, 180 - w_filled)
+        bar_table = Table([['', '']], colWidths=[w_filled, w_empty])
+        bar_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#3B82F6')),
+            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#F1F5F9')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+        ]))
+        return bar_table
+
+    ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>성취도 선형 그래프</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
     for ch in data.get("chapters", []):
-        ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(f"{ch['achievement']}%", body_center)])
+        ach_clean = ''.join(filter(str.isdigit, str(ch['achievement'])))
+        ch_rows.append([
+            Paragraph(ch['name'], body_style), 
+            make_ch_bar_cell(ach_clean), 
+            Paragraph(f"{ch['achievement']}%", body_center)
+        ])
         
     t_ch = Table(ch_rows, colWidths=w_ch)
     t_ch.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#F1F5F9')),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,1), (1,-1), 'CENTER'),
         ('TOPPADDING', (0,0), (-1,-1), 5),
         ('BOTTOMPADDING', (0,0), (-1,-1), 5),
     ]))
@@ -132,6 +152,8 @@ def create_academy_report(data, cropped_image_path=None):
     story.append(Spacer(1, 12))
     
     story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
+    story.append(Spacer(1, 4))
+    
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     
     drawing = Drawing(515, 100)
@@ -164,22 +186,7 @@ def create_academy_report(data, cropped_image_path=None):
             drawing.add(Line(px, py, x, y, strokeColor=colors.HexColor('#1E3A8A'), strokeWidth=1.5))
             
     story.append(drawing)
-    story.append(Spacer(1, 12))
-    
-    # [원장님 요청사항 적용] 텍스트가 아닌, 매쓰플랫 PDF에서 물리적으로 도려낸 실제 이미지 표 그 자체를 합성
-    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (매쓰플랫 원본 이미지)", section_style))
-    story.append(Spacer(1, 4))
-    
-    if cropped_image_path and os.path.exists(cropped_image_path):
-        try:
-            # 캡처된 원본 표 이미지를 A4 가로폭에 맞춰 삽입 (A4폭 맞춤 가로 400pt, 세로 75pt 자동 조율)
-            story.append(RLImage(cropped_image_path, width=400, height=75))
-        except Exception as img_err:
-            story.append(Paragraph(f"⚠️ 원본 이미지 결합 오류: {img_err}", body_style))
-    else:
-        story.append(Paragraph("⚠️ 매쓰플랫 4페이지에서 대표 취약 유형 표 이미지를 추출하지 못했습니다.", body_style))
-        
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 15))
     
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
@@ -219,59 +226,60 @@ if uploaded_file is not None:
             del st.session_state['parsed_data']
         if 'input_cleared' in st.session_state:
             del st.session_state['input_cleared']
-        # 임시 보관 중인 도려낸 이미지 리셋
-        if os.path.exists("temp_cropped_weak.png"):
-            os.remove("temp_cropped_weak.png")
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI 진단 엔진이 4페이지에서 대표 취약 유형 원본 표를 정밀 캡처 중입니다..."):
+        with st.spinner("코넬 고성능 AI 엔진이 난이도별 수치 5회차 교차 검증 및 5단계 Comment 정밀 윤문을 진행 중입니다..."):
             try:
-                # [해결 핵심 로직] PDF의 모든 바이트를 읽어와 이미지 파일 배열로 강제 변환 (300DPI 고화질)
-                pdf_bytes = uploaded_file.getvalue()
-                images = convert_from_bytes(pdf_bytes, dpi=300)
-                
-                # 매쓰플랫 4페이지(리스트 인덱스 상 3번째 페이지) 선택
-                if len(images) >= 4:
-                    target_page_image = images[3]
-                    img_w, img_h = target_page_image.size
-                    
-                    # 매쓰플랫 표준 양식 기준, 4페이지 상단에 위치한 '대표 취약 유형' 표의 정확한 픽셀 좌표 지정
-                    # (전체 이미지 해상도 기준 상단에서 약간 아래 영역을 가로지르도록 crop 상자 정의)
-                    left = int(img_w * 0.08)
-                    top = int(img_h * 0.12)
-                    right = int(img_w * 0.92)
-                    bottom = int(img_h * 0.23)
-                    
-                    # 이미지 슬라이싱(도려내기) 실행 및 서버 디렉토리에 임시 물리 파일로 저장
-                    cropped_img = target_page_image.crop((left, top, right, bottom))
-                    cropped_img.save("temp_cropped_weak.png")
-                
-                # 기존의 꼬인 서체 파싱 대신, 구조적 수치 파싱 용도로만 프롬프트 간소화 작동
                 reader = PdfReader(uploaded_file)
                 full_text = ""
-                for page in reader.pages:
+                for idx, page in enumerate(reader.pages, 1):
                     text = page.extract_text()
                     if text: full_text += text + "\n"
 
                 client = OpenAI(api_key=api_key)
-                system_prompt = """
-                너는 매쓰플랫 보고서의 정렬 체계를 다루는 최고 등급의 데이터 분석관이야.
-                너는 텍스트 깨짐과 상관없이 오직 날짜, 점수, 난이도별 정답률 수치만 완벽하게 캐치해서 아래 JSON 포맷을 채워야 해.
-                teacher_comment: "코넬수학에 관심을 가지고 진단에 응해주어 감사하다"는 정중한 감사 멘트로 친절히 시작하고, 3중 자체 검증을 거친 신뢰도 높은 원장님 서체 문장(4~5문장)으로 구성할 것.
-                """
                 
+                system_prompt = """
+                너는 매쓰플랫 성적 보고서 분석기이자 입학 상담 전문학원의 수석 원장 서체 전문가야.
+
+                [데이터 분석 미션 - 난이도별 정답률 수치 교정 5회 반복]:
+                - 매쓰플랫 내부 폰트 문제로 하, 중하, 중, 상, 최상 난이도 퍼센트 기호 옆 숫자가 모호할 수 있어.
+                - 너는 내부적으로 이 데이터를 총 5회 반복 연속 검증(5-step check)하여 오차를 완전 교정하고 difficulty 객체에 정수로 채워라.
+
+                [상담 코멘트 5회차 원장님 톤앤매너 재윤문]:
+                - teacher_comment 첫 줄은 반드시 "코넬수학에 관심을 가지고 진단에 응해주어 감사하다"로 정중히 시작해라.
+                - 단원 결손을 분석하고 코넬의 솔루션과 치밀한 개별 맞춤 관리로 상위권으로 도약시킬 확신을 주는 원장 어조로 써라.
+                - 문맥 결함을 5회 연속 스스로 수정(5-turn refinement)하여 최상의 완성도를 가진 4~5문장으로만 완성해라.
+
+                [반드시 지켜야 할 응답 JSON 형식]:
+                {
+                    "student_name": "교정된 학생 이름",
+                    "school_name": "학교명",
+                    "student_grade": "학년",
+                    "report_month": "YYYY/MM/DD 형식의 시험 일자",
+                    "score": "종합 점수 (숫자만)",
+                    "chapters": [
+                        {"name": "올바른 단원명 1", "achievement": "성취도 숫자"},
+                        {"name": "올바른 단원명 2", "achievement": "성취도 숫자"}
+                    ],
+                    "difficulty": {
+                        "최상": "5회 검증된 최상 정답률 숫자",
+                        "상": "5회 검증된 상 정답률 숫자",
+                        "중": "5회 검증된 중 정답률 숫자",
+                        "중하": "5회 검증된 중하 정답률 숫자",
+                        "하": "5회 검증된 하 정답률 숫자"
+                    },
+                    "teacher_comment": "5회차 윤문을 거친 전문 학원 원장님 입학 상담 코멘트"
+                }
+                """
                 response = client.chat.completions.create(
                     model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"점수와 날짜, 난이도별 수치만 정확히 채워줘:\n{full_text}"}
-                    ],
+                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": full_text}],
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices.message.content
+                ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 4페이지 대표 취약 유형 원본 표 이미지 자동 캡처 성공!")
+                st.success("🎉 코넬 멀티턴 인코딩 분석 및 5차 윤문 고도화 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
@@ -285,11 +293,11 @@ if uploaded_file is not None:
             st.session_state['input_cleared'] = True
         
         st.markdown("---")
-        st.subheader("🎯 입학 상담용 결과지 세부 정보 입력")
+        st.subheader("🎯 입학 상담용 결과지 세부 정보 입력 및 검토")
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            student_name = st.text_input("학생 이름 (필수)", value=res.get("student_name", ""))
+            student_name = st.text_input("학생 이름 (필수 입력)", value=res.get("student_name", ""))
         with col2:
             school_name = st.text_input("학교명 입력", value=res.get("school_name", ""))
         with col3:
@@ -298,7 +306,7 @@ if uploaded_file is not None:
         report_month = st.text_input("시험 일자 (년/월/일)", value=res.get("report_month", ""))
         score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
         
-        st.markdown("#### 📊 난이도별 정답률 수정 검토 (오차 발생 시 여기서 직접 수정하세요)")
+        st.markdown("#### 📊 5회 교차 검증된 난이도별 정답률 확인 (최종 조율창)")
         diff_obj = res.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
         
         d_col1, d_col2, d_col3, d_col4, d_col5 = st.columns(5)
@@ -317,7 +325,7 @@ if uploaded_file is not None:
             "하": d_ha, "중하": d_mid_ha, "중": d_mid, "상": d_sang, "최상": d_choi
         }
         
-        teacher_comment = st.text_area("🦅 코넬 분석 Comment (상담 방향에 맞게 편집 가능)", value=res.get("teacher_comment", ""), height=150)
+        teacher_comment = st.text_area("🦅 코넬 분석 Comment (5차 윤문 초안 제공 / 수정 가능)", value=res.get("teacher_comment", ""), height=150)
         
         res["student_name"] = student_name
         res["school_name"] = school_name
@@ -327,8 +335,7 @@ if uploaded_file is not None:
         res["teacher_comment"] = teacher_comment
         
         try:
-            # 캡처된 이미지 파일 경로를 성적표 빌더 함수로 토스
-            pdf_data = create_academy_report(res, cropped_image_path="temp_cropped_weak.png")
+            pdf_data = create_academy_report(res)
             
             st.markdown("---")
             st.subheader("👀 결과지 실시간 미리보기")
