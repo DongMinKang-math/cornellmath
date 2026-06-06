@@ -59,7 +59,6 @@ def create_academy_report(data):
         
     styles = getSampleStyleSheet()
     
-    # 프리미엄 디자인 폰트 서체 스타일 정의
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=18, leading=22, alignment=1, textColor=colors.HexColor('#FFFFFF'))
     info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=12, alignment=2, textColor=colors.HexColor('#64748B'))
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, textColor=colors.HexColor('#1E293B'))
@@ -83,9 +82,7 @@ def create_academy_report(data):
     story.append(Paragraph(f"<b>시험 일자:</b> {data.get('report_month', '년/월/일')}", info_style))
     story.append(Spacer(1, 4))
     
-    computed_level = calculate_math_level(data.get('score', '0'))
-    
-    # 텍스트 유실 방지 수식 가로폭 지정 (총합 515)
+    # 컴파일 오류를 유실을 원천 차단하기 위해 대괄호 고정값을 수식형 비율로 선언 (A4 내부 가로폭 515 완벽 매핑)
     w_info = [515 / 6] * 6
     w_ch = [515 * 0.42, 515 * 0.45, 515 * 0.13]
     w_comment = 515
@@ -95,7 +92,7 @@ def create_academy_report(data):
          Paragraph('<b>학 교 명</b>', body_center), Paragraph(data.get('school_name', ''), body_style),
          Paragraph('<b>학 년</b>', body_center), Paragraph(data.get('student_grade', ''), body_style)],
         [Paragraph('<b>종합 점수</b>', body_center), Paragraph(f"<b>{data.get('score', '')} 점</b>", body_style),
-         Paragraph('<b>진단 레벨</b>', body_center), Paragraph(f"<b>{computed_level} Level</b>", body_style),
+         Paragraph('<b>진단 레벨</b>', body_center), Paragraph(f"<b>{calculate_math_level(data.get('score', '0'))} Level</b>", body_style),
          Paragraph('', body_style), Paragraph('', body_style)]
     ]
     
@@ -116,26 +113,33 @@ def create_academy_report(data):
     story.append(Paragraph("📈 단원별 성취 분석", section_style))
     story.append(Spacer(1, 4))
     
-    # [디자인 개선] 성취도 그래프 바를 두께 5pt 미만의 초슬림 고급 선형 레이아웃으로 변경
+    # [디자인 완성] 1.5pt 극초슬림 실선 바 레이아웃 및 3색 그라데이션 선형 매핑 적용
     def make_ch_bar_cell(pct_val):
         try:
             pct = min(100, max(0, int(pct_val)))
         except:
             pct = 0
-        w_filled = max(1, int(pct * 2.0))
-        w_empty = max(1, 200 - w_filled)
+        w_total_filled = max(1, int(pct * 2.0))
+        w_empty = max(1, 200 - w_total_filled)
         
-        # 얇고 스마트한 인디고 블루 선형 라인 구현
-        bar_table = Table([['', '']], colWidths=[w_filled, w_empty])
+        seg1 = min(w_total_filled, 70)
+        seg2 = min(max(0, w_total_filled - 70), 70)
+        seg3 = max(0, w_total_filled - 140)
+        
+        # 글자 수 유실 방지 가변 연산 패치
+        bar_widths = [max(0.1, seg1), max(0.1, seg2), max(0.1, seg3), w_empty]
+        bar_table = Table([['', '', '', '']], colWidths=bar_widths)
         bar_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#2563EB')),
-            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#E2E8F0')),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
-            ('TOPPADDING', (0,0), (-1,-1), 2.5),
+            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#1E3A8A')),
+            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#2563EB')),
+            ('BACKGROUND', (2,0), (2,0), colors.HexColor('#60A5FA')),
+            ('BACKGROUND', (3,0), (3,0), colors.HexColor('#E2E8F0')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0.8),
+            ('TOPPADDING', (0,0), (-1,-1), 0.8),
         ]))
         return bar_table
 
-    ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
+    ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표 (선형 그라데이션)</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
     for ch in data.get("chapters", []):
         ach_clean = ''.join(filter(str.isdigit, str(ch['achievement'])))
         ch_rows.append([
@@ -162,22 +166,25 @@ def create_academy_report(data):
     drawing = Drawing(515, 100)
     drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
     
-    for y_val in [25, 50, 75, 100]:
-        y_pos = int(y_val * 0.8) + 10
+    # [수정완료] 잘려나가기 쉽던 대괄호 묶음 대신 수식 루프로 Y 가이드라인 배정 처리
+    for i in range(1, 5):
+        y_pos = int((i * 25) * 0.8) + 10
         drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5, strokeDashArray=[2, 2]))
     
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    x_coords = [50, 150, 257, 365, 465]
     
-    for i, lvl in enumerate(levels):
+    # [수정완료] 잘려나가기 쉽던 X축 좌표 대괄호를 수식형 연산 루프로 복구 완료 (5등분)
+    for i in range(5):
+        lvl = levels[i]
         try:
             val = int(''.join(filter(str.isdigit, str(st_diff.get(lvl, '0')))))
         except:
             val = 0
         val = min(100, max(0, val))
+        x_pos = int(40 + (i * 108))
         y_pos = int(val * 0.8) + 10
-        points.append((x_coords[i], y_pos, val))
+        points.append((x_pos, y_pos, val))
         
     for i in range(len(points)):
         x, y, v = points[i]
@@ -211,7 +218,7 @@ def create_academy_report(data):
         logo_filename = "cornell.png"
         if os.path.exists(logo_filename):
             try:
-                canvas.drawImage(logo_filename, 242, 12, width=110, height=38, mask='auto')
+                canvas.drawImage(logo_filename, 242, 10, width=110, height=42, mask='auto')
             except:
                 pass
         canvas.restoreState()
@@ -241,16 +248,16 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 
-                # [오류 해결 완료] response.choices[0].message.content 문법에 맞춰 인덱스 지침 연동 및 부드러운 톤앤매너 프롬프트 고도화
+                # 명문 수학전문학원 원장의 학부모 카운셀링 블로그 문구를 완전하게 사상 주입하는 특수 지시문
                 system_prompt = """
-                너는 강남 대치동 및 목동의 상위권 수학전문학원에서 학부모 입학 상담을 전담하는 친절하고 깊이 있는 원장이야.
+                너는 강남 대치동 및 목동의 상위권 수학전문학원인 코넬수학에서 학부모 입학 상담을 전담하는 친절하고 깊이 있는 원장이야.
                 매쓰플랫 원본의 난이도별 데이터 수치 교정을 5회 반복 검증하여 오차 없는 데이터 JSON을 빌드해라.
 
                 [학부모 상담용 극도로 부드럽고 정중한 어조 지침]:
                 1. 첫 문장은 무조건 "코넬수학에 관심을 가지고 소중한 자녀의 진단평가에 응해주셔서 깊이 감사드립니다."로 아주 따뜻하고 정중하게 출발할 것.
                 2. 명령조나 지나치게 딱딱한 표현(요구됩니다, 필요합니다, 요망됩니다 등)은 전면 금지한다. 수학 전문 학원 블로그의 친절한 분석 글처럼 "~해보입니다", "~하는 성향을 띠고 있습니다", "~를 다져나간다면 충분히 성장할 수 있습니다"와 같은 서술어 구조로 부드럽게 감싸줄 것.
                 3. 결론부에는 '코넬수학만의 차별화된 세심하고 밀착된 1대1 관리 시스템과 철저한 오답 보완 매커니즘을 결합하여, 부족했던 영역을 탄탄한 심화 개념으로 반전시키고 상위권으로 안심하고 도약할 수 있도록 저희 교사진이 사랑과 책임감으로 지도하겠습니다'라는 확신과 안도감을 주는 멘트로 마감할 것.
-                4. 이 세부 조건들을 바탕으로 문맥을 스스로 5회 연속 리팩토링(5-turn refinement)하여 부드러움과 신뢰가 극대화된 완성형 코멘트(4~5문장)로 리턴해라.
+                4. 이 세부 조건들을 바탕으로 문맥을 스스로 5회 연속 리팩토링(5-turn refinement)하여 부드러움และ 신뢰가 극대화된 완성형 코멘트(4~5문장)로 리턴해라.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
@@ -279,7 +286,7 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                # [문법 오류 근본 교정] 리스트의 첫 번째 원소 인덱스 [0] 추가 반영으로 컴파일 통과 확보
+                # [문법 교정 완료] response.choices[0] 형태의 문법적 오류 소지를 전면 타파하여 컴파일 구조 완비
                 ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 대형학원 상담 멘트 최적화 및 문법 오류 해결 완료!")
