@@ -2,3 +2,4 @@ streamlit
 pypdf
 openai
 reportlab
+streamlit-pdf-viewer
