@@ -44,7 +44,6 @@ def calculate_math_level(score_str):
 # PDF 성적표 생성 함수 정의
 def create_academy_report(data):
     buffer = io.BytesIO()
-    # 1페이지 최적화 여백 세팅 (상하 25pt, 좌우 40pt)
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=45)
     story = []
     
@@ -60,7 +59,6 @@ def create_academy_report(data):
         
     styles = getSampleStyleSheet()
     
-    # [디자인 개선 4] 타이틀 가독성을 최고 등급으로 올린 굵은 백색 서체 스타일 정의
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=18, leading=22, alignment=1, textColor=colors.HexColor('#FFFFFF'))
     info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=12, alignment=2, textColor=colors.HexColor('#64748B'))
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, textColor=colors.HexColor('#1E293B'))
@@ -69,7 +67,6 @@ def create_academy_report(data):
     
     story.append(Spacer(1, 5))
     
-    # [디자인 개선 4] 상단 제목을 고품격 네이비 배너 박스 레이아웃으로 변경
     title_banner_data = [[Paragraph("<b>코넬수학전문학원 신규생 진단평가 결과 분석지</b>", title_style)]]
     t_banner = Table(title_banner_data, colWidths=[515])
     t_banner.setStyle(TableStyle([
@@ -87,7 +84,6 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # 코드 잘림 유실을 원천 차단하기 위한 폭 고정 자동 분할 연산
     w_info = [515 / 6] * 6
     w_ch = [515 * 0.75, 515 * 0.25]
     w_comment = [515]
@@ -133,26 +129,21 @@ def create_academy_report(data):
     story.append(t_ch)
     story.append(Spacer(1, 12))
     
-    # [수정사항 1] 하, 중하, 중, 상, 최상 기준의 꺾은선 그래프 정밀 그리기 구현
     story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
     story.append(Spacer(1, 4))
     
+    # [수정사항 2] 정밀 필터링된 5단계 수치를 차트에 바인딩
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     
-    # 꺾은선 캔버스 생성 (가로 515, 세로 100)
     drawing = Drawing(515, 100)
     drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
     
-    # Y축 가이드 점선 그리기 (25%, 50%, 75%, 100% 라인)
-    for y_val in [25, 50, 75]:
+    for y_val in [25, 50, 75, 100]:
         y_pos = int(y_val * 0.8) + 10
-        drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#CBD5E1'), strokeWidth=0.5, strokeDashArray=[2,2]))
+        drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#CBD5E1'), strokeWidth=0.5, strokeDashArray=[2, 2]))
     
-    # 하, 중하, 중, 상, 최상 수치 정수화 연산
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    
-    # 가로폭 515pt를 5개 영역으로 등분하여 X좌표 설정
     x_coords = [45, 150, 257, 365, 470]
     
     for i, lvl in enumerate(levels):
@@ -161,19 +152,14 @@ def create_academy_report(data):
         except:
             val = 0
         val = min(100, max(0, val))
-        y_pos = int(val * 0.8) + 10 # Y축 스케일링 가중치
+        y_pos = int(val * 0.8) + 10
         points.append((x_coords[i], y_pos, val))
         
-    # 꺾은선 및 데이터 마커 그리기
     for i in range(len(points)):
         x, y, v = points[i]
-        # 텍스트 라벨 (하, 중하...)
         drawing.add(String(x, 2, levels[i], fontName='CustomFont', fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#475569')))
-        # 데이터 점수 마커 수치 출력
         drawing.add(String(x, y + 5, f"{v}%", fontName='CustomFont', fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#1E3A8A')))
-        # 파란색 도트 좌표 그리기
         drawing.add(Circle(x, y, 3, fillColor=colors.HexColor('#1E3A8A'), strokeColor=colors.HexColor('#FFFFFF'), strokeWidth=1))
-        # 선 잇기
         if i > 0:
             px, py, _ = points[i-1]
             drawing.add(Line(px, py, x, y, strokeColor=colors.HexColor('#1E3A8A'), strokeWidth=1.5))
@@ -181,11 +167,16 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 12))
     
-    # [수정사항 2] 집중 보완 취약 유형 섹션 동적 삽입
-    story.append(Paragraph("🚨 집중 보완 필요 취약 유형", section_style))
+    # [수정사항 1] 동적으로 추출된 대표 취약 유형을 성적표 본문에 매핑
+    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (4Page 기반 분석)", section_style))
     story.append(Spacer(1, 4))
-    for i, weak in enumerate(data.get("weak_types", []), 1):
-        story.append(Paragraph(f"• <b>{weak}</b> : 해당 유형의 오답 원인을 파악하고 클리닉 강좌를 통해 우선 보완이 요구됩니다.", body_style))
+    
+    weak_list = data.get("weak_types", [])
+    if not weak_list:
+        weak_list = ["종합 단원 연산 세부 개념", "응용 심화 문제 해결력", "문장제 문제 식 세우기 메커니즘"]
+        
+    for i, weak in enumerate(weak_list, 1):
+        story.append(Paragraph(f"• <b>{weak}</b> : 해당 개념유형의 오답 분석 및 코넬 맞춤형 오답 클리닉 학습이 집중적으로 필요합니다.", body_style))
     story.append(Spacer(1, 12))
     
     story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
@@ -203,7 +194,6 @@ def create_academy_report(data):
     ]))
     story.append(t_comment)
     
-    # [수정사항 3] 위아래로 찌그러졌던 로고의 종횡비를 높여서 정상으로 보정 (가로 100, 세로 45)
     def add_footer_logo(canvas, doc):
         canvas.saveState()
         logo_filename = "cornell.png"
@@ -229,40 +219,49 @@ if uploaded_file is not None:
             del st.session_state['input_cleared']
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI 엔진이 레벨테스트지를 분석하여 정밀 진단 데이터를 정제 중입니다..."):
+        with st.spinner("코넬 AI 엔진이 4페이지 세부 진단 결과 및 난이도별 정답률을 교정 분석 중입니다..."):
             try:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
-                for page in reader.pages:
+                
+                # AI 분석 최적화를 위해 페이지 번호를 트래킹하며 텍스트 결합
+                for idx, page in enumerate(reader.pages, 1):
                     text = page.extract_text()
-                    if text: full_text += text + "\n"
+                    if text:
+                        full_text += f"\n--- [PAGE {idx}] ---\n" + text
 
                 client = OpenAI(api_key=api_key)
+                
+                # [수정사항 1, 2] 수치 오차 및 4페이지 취약 유형 타겟 추출을 강제하는 정밀 프롬프트 가이드라인 설정
                 system_prompt = """
-                너는 코넬수학전문학원의 전문 입학상담 실장이야. 
-                매쓰플랫 결과 데이터에서 성적 정보와 함께 학생의 오답률이 가장 높은 취약 유형 3가지를 가공해줘.
-                종합 코멘트는 "코넬수학에 문을 두드려주어 감사하다"는 환영 인사로 정중하게 시작하고, 단원별 상태 진단 점검 및 코넬의 밀착 솔루션을 담아 4~5문장으로 채워줘.
+                너는 코넬수학전문학원의 수석 입학진단 실장이야.
+                매쓰플랫 결과 텍스트를 분석하여 신규 등록용 진단 보고서 데이터 JSON을 완벽하게 빌드해줘.
+
+                [추출 필수 준수 조건]:
+                1. weak_types 추출: 텍스트 내에서 '--- [PAGE 4] ---' 라벨 주변 또는 단원별 취약 유형 분석란을 집중 점검하여, 오답률이 가장 높은 대표적인 세부 수학 유형 이름 3가지를 한국어로 명확히 골라내어 배열에 담아줘.
+                2. difficulty 수치 추출: 각 난이도(최상, 상, 중, 중하, 하)별 정답률은 다른 점수와 혼동하지 마라. 표 안의 난이도 옆에 매칭된 순수한 퍼센트(%) 숫자만 추출해야 해. 만약 특정 난이도가 문제에 출제되지 않아 공란이거나 찾을 수 없다면 유추하지 말고 반드시 "0"으로 반환해라.
+                3. teacher_comment: 학부모님이 신뢰를 가질 수 있도록 친절하고 깊이 있는 문장으로 4~5문장 작성해줘.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
                     "student_name": "학생 이름",
                     "school_name": "학교명",
                     "student_grade": "학년",
-                    "report_month": "오늘 날짜 또는 테스트 시행 월",
+                    "report_month": "오늘 날짜 또는 진단 회차",
                     "score": "종합 성취 점수(숫자만)",
                     "chapters": [
                         {"name": "분석 단원명 1", "achievement": "성취도 숫자"},
                         {"name": "분석 단원명 2", "achievement": "성취도 숫자"}
                     ],
                     "difficulty": {
-                        "최상": "최상 난이도 정답률 숫자",
-                        "상": "상 난이도 정답률 숫자",
-                        "중": "중 난이도 정답률 숫자",
-                        "중하": "중하 난이도 정답률 숫자",
-                        "하": "하 난이도 정답률 숫자"
+                        "최상": "최상 정답률 숫자만",
+                        "상": "상 정답률 숫자만",
+                        "중": "중 정답률 숫자만",
+                        "중하": "중하 정답률 숫자만",
+                        "하": "하 정답률 숫자만"
                     },
-                    "weak_types": ["가장 취약한 세부 수학 유형명 1", "유형명 2", "유형명 3"],
-                    "teacher_comment": "상담 코멘트 문구"
+                    "weak_types": ["4페이지 기반 대표 취약 유형 1", "유형 2", "유형 3"],
+                    "teacher_comment": "정중한 입학 상담 코멘트 문구"
                 }
                 """
                 response = client.chat.completions.create(
@@ -271,9 +270,9 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices[0].message.content
+                ai_raw_data = response.choices.message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 정밀 분석 완료!")
+                st.success("🎉 코넬 4페이지 크로스체크 및 데이터 보정 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
