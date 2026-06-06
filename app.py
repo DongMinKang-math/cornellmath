@@ -14,10 +14,10 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # 웹 페이지 설정
-st.set_page_config(page_title="학원 성적표 변환 자동화", layout="centered")
+st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", layout="centered")
 
-st.title("📊 매쓰플랫 보고서 ➡️ 학원 성적표 변환기")
-st.caption("A4 인쇄용 고품질 PDF 출력 시스템")
+st.title("🦅 코넬수학전문학원 레벨테스트 결과지 변환기")
+st.caption("매쓰플랫 PDF를 분석하여 공식 신규생 레벨테스트 결과지를 자동 생성합니다.")
 st.markdown("---")
 
 # Secrets에서 안전하게 API Key 로드
@@ -27,97 +27,121 @@ except Exception:
     st.error("❌ Streamlit Cloud Settings -> Secrets에 'OPENAI_API_KEY'가 설정되지 않았습니다.")
     st.stop()
 
+# 점수에 따라 알파벳 레벨을 자동으로 계산하는 함수
+def calculate_math_level(score_str):
+    try:
+        score = int(''.join(filter(str.isdigit, str(score_str))))
+        if score >= 88: return "A"
+        elif score >= 72: return "B"
+        elif score >= 48: return "C"
+        elif score >= 20: return "D"
+        else: return "F"
+    except:
+        return "C"
+
 # PDF 성적표 생성 함수 정의
 def create_academy_report(data):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=60)
     story = []
     
-    # 깃허브에 업로드한 폰트 파일 연동 설정
-    font_filename = "NANUMGOTHIC.TTF"
+    font_filename = "NANUMGOTHIC.TTF" 
     
     if os.path.exists(font_filename):
         pdfmetrics.registerFont(TTFont('CustomFont', font_filename))
         font_name = 'CustomFont'
     else:
-        st.warning(f"⚠️ 저장소에 {font_filename} 파일이 없어 한글이 공백으로 나올 수 있습니다. 폰트를 업로드해 주세요.")
+        st.warning(f"⚠️ 저장소에 {font_filename} 파일이 발견되지 않았습니다.")
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
         font_name = 'HeiseiMin-W3'
         
     styles = getSampleStyleSheet()
     
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=24, leading=28, alignment=1, textColor=colors.HexColor('#1E3A8A'))
-    info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=11, leading=14, alignment=2)
-    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=11, leading=16)
-    section_style = ParagraphStyle('SectionStyle', parent=styles['Heading2'], fontName=font_name, fontSize=14, leading=18, textColor=colors.HexColor('#1E3A8A'))
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=20, leading=26, alignment=1, textColor=colors.HexColor('#0F172A'))
+    info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=14, alignment=2)
+    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=15)
+    body_center = ParagraphStyle('BodyCenter', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=15, alignment=1)
+    section_style = ParagraphStyle('SectionStyle', parent=styles['Heading2'], fontName=font_name, fontSize=13, leading=17, textColor=colors.HexColor('#1E3A8A'))
     
-    # 상단 학원 로고 배치
-    logo_filename = "cornell.png"
-    if os.path.exists(logo_filename):
-        try:
-            story.append(Image(logo_filename, width=120, height=40))
-            story.append(Spacer(1, 10))
-        except:
-            pass
-            
-    story.append(Paragraph("수 학 학 원  정 기  성 적 표", title_style))
     story.append(Spacer(1, 15))
-    story.append(Paragraph(f"<b>분석 기준일:</b> {data.get('report_month', '이번 달')}", info_style))
+    story.append(Paragraph("<b>코넬수학전문학원 신규생 레벨테스트 결과지</b>", title_style))
+    story.append(Spacer(1, 15))
+    story.append(Paragraph(f"<b>진단일:</b> {data.get('report_month', '최근')}", info_style))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#1E3A8A'), spaceBefore=5, spaceAfter=20))
     
-    # [수정완료] 학생 기본 정보 표 가로 너비 (총 510)
+    computed_level = calculate_math_level(data.get('score', '0'))
+    
+    # [수정완료] 학생 정보 표 너비 고정 (총 510)
     info_data = [
-        [Paragraph('<b>학 생 명</b>', body_style), Paragraph(data.get('student_name', ''), body_style),
-         Paragraph('<b>종합 점수</b>', body_style), Paragraph(f"{data.get('score', '')}점", body_style),
-         Paragraph('<b>반 평 균</b>', body_style), Paragraph(f"{data.get('average_score', '')}점", body_style)]
+        [Paragraph('<b>학 생 명</b>', body_center), Paragraph(data.get('student_name', ''), body_style),
+         Paragraph('<b>학 교 명</b>', body_center), Paragraph(data.get('school_name', ''), body_style),
+         Paragraph('<b>학 년</b>', body_center), Paragraph(data.get('student_grade', ''), body_style)],
+        [Paragraph('<b>종합 점수</b>', body_center), Paragraph(f"<b>{data.get('score', '')} 점</b>", body_style),
+         Paragraph('<b>진단 레벨</b>', body_center), Paragraph(f"<b>{computed_level} Level</b>", body_style),
+         Paragraph('', body_style), Paragraph('', body_style)]
     ]
-    t_info = Table(info_data, colWidths=[80, 90, 80, 90, 80, 90])
+    
+    t_info = Table(info_data, colWidths=[70, 100, 70, 100, 70, 100])
     t_info.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F1F5F9')),
-        ('BACKGROUND', (2,0), (2,0), colors.HexColor('#F1F5F9')),
+        ('BACKGROUND', (0,0), (0,1), colors.HexColor('#F1F5F9')),
+        ('BACKGROUND', (2,0), (2,1), colors.HexColor('#F1F5F9')),
         ('BACKGROUND', (4,0), (4,0), colors.HexColor('#F1F5F9')),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('SPAN', (3,1), (5,1)),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('TOPPADDING', (0,0), (-1,-1), 8),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
     ]))
     story.append(t_info)
-    story.append(Spacer(1, 25))
+    story.append(Spacer(1, 20))
     
-    story.append(Paragraph("📈 단원별 세부 성취도", section_style))
-    story.append(Spacer(1, 8))
+    story.append(Paragraph("📈 단원별 평가 분석", section_style))
+    story.append(Spacer(1, 6))
     
-    ch_rows = [[Paragraph('<b>분석 단원명</b>', body_style), Paragraph('<b>성취도 (%)</b>', body_style)]]
+    ch_rows = [[Paragraph('<b>평가 단원 영역</b>', body_center), Paragraph('<b>성취도 (%)</b>', body_center)]]
     for ch in data.get("chapters", []):
-        ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(f"{ch['achievement']}%", body_style)])
+        ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(f"{ch['achievement']}%", body_center)])
         
-    # [수정완료] 단원 성취도 표 가로 너비 (총 510)
+    # [수정완료] 단원 분석 표 너비 고정 (총 510)
     t_ch = Table(ch_rows, colWidths=[380, 130])
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-        ('ALIGN', (1,0), (1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
     ]))
     story.append(t_ch)
-    story.append(Spacer(1, 25))
+    story.append(Spacer(1, 20))
     
-    story.append(Paragraph("🚨 집중 보완이 필요한 취약 유형", section_style))
-    story.append(Spacer(1, 8))
-    for i, weak in enumerate(data.get("weak_types", []), 1):
-        story.append(Paragraph(f"<b>{i}.</b> {weak}", body_style))
-        story.append(Spacer(1, 6))
-    story.append(Spacer(1, 25))
+    story.append(Paragraph("📊 문항 난이도별 정답률 분석", section_style))
+    st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "하": "0"})
     
-    story.append(Paragraph("📝 학원 지도 및 종합 의견", section_style))
-    story.append(Spacer(1, 8))
+    # [수정완료] 난이도 표 너비 고정 (총 510)
+    diff_data = [
+        [Paragraph('<b>난이도</b>', body_center), Paragraph('<b>정답률</b>', body_center), Paragraph('<b>취약도 진단</b>', body_center)],
+        [Paragraph('최상 / 상', body_style), Paragraph(f"{st_diff.get('상', '0')}%", body_center), Paragraph('심화 개념 및 고난도 문제해결력 진단', body_style)],
+        [Paragraph('중', body_style), Paragraph(f"{st_diff.get('중', '0')}%", body_center), Paragraph('응용 문제 및 핵심 유형 적용력 진단', body_style)],
+        [Paragraph('하', body_style), Paragraph(f"{st_diff.get('하', '0')}%", body_center), Paragraph('기본 개념 및 기초 계산 능력 진단', body_style)]
+    ]
+    t_diff = Table(diff_data, colWidths=[100, 80, 330])
+    t_diff.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (2,0), colors.HexColor('#E2E8F0')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+    ]))
+    story.append(t_diff)
+    story.append(Spacer(1, 20))
     
-    # [수정완료] 코멘트 박스 가로 너비 (총 510)
-    comment_box = [[Paragraph(data.get('teacher_comment', '내용 없음').replace('\n', '<br/>'), body_style)]]
+    story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
+    story.append(Spacer(1, 6))
+    
+    # [수정완료] 의견란 너비 고정 (총 510)
+    comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
     t_comment = Table(comment_box, colWidths=[510])
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
@@ -129,15 +153,21 @@ def create_academy_report(data):
     ]))
     story.append(t_comment)
     
-    story.append(Spacer(1, 35))
-    story.append(Paragraph("<b>수학전문학원 원장 드림</b>", ParagraphStyle('Footer', parent=body_style, alignment=1, fontSize=13)))
-    
-    doc.build(story)
+    def add_footer_logo(canvas, doc):
+        canvas.saveState()
+        logo_filename = "cornell.png" 
+        if os.path.exists(logo_filename):
+            try:
+                canvas.drawImage(logo_filename, 237, 20, width=120, height=30, mask='auto')
+            except:
+                pass
+        canvas.restoreState()
+        
+    doc.build(story, onFirstPage=add_footer_logo, onLaterPages=add_footer_logo)
     buffer.seek(0)
     return buffer
-
 # 파일 업로드 화면 구성
-uploaded_file = st.file_uploader("매쓰플랫 보고서 PDF 파일을 업로드하세요", type=["pdf"])
+uploaded_file = st.file_uploader("매쓰플랫 레벨테스트 결과 PDF 파일을 선택하세요", type=["pdf"])
 
 if uploaded_file is not None:
     if 'current_file' not in st.session_state or st.session_state['current_file'] != uploaded_file.name:
@@ -146,7 +176,7 @@ if uploaded_file is not None:
             del st.session_state['parsed_data']
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("PDF에서 성적 데이터를 분석하는 중입니다..."):
+        with st.spinner("코넬 AI 엔진이 레벨테스트지를 분석하여 정밀 진단 데이터를 정제 중입니다..."):
             try:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
@@ -156,19 +186,31 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 system_prompt = """
-                너는 수학학원의 데이터 분석 전문가야. 제공된 매쓰플랫 PDF 텍스트에서 학부모용 성적표에 들어갈 핵심 정보만 추출해서 JSON으로 응답해줘.
+                너는 코넬수학전문학원의 전문 입학상담 실장이자 교육 분석가야. 
+                제공된 매쓰플랫 테스트 결과 텍스트에서 데이터를 추출하고, '새로 학원을 등록하려는 신규 학생과 학부모'를 타겟으로 정중하고 친절하면서도 학원의 전문성이 돋보이는 분석 JSON을 작성해줘.
+
+                [분석 가이드라인]:
+                - teacher_comment 작성 시: "코넬수학에 문을 두드려주어 감사하다"는 뉘앙스의 친절한 첫인사로 시작할 것.
+                - 학생이 어떤 대단원에서 강점과 약점을 보이는지 텍스트 기반으로 날카롭게 짚어줄 것.
+                - 향후 코넬수학의 정밀 커리큘럼을 통해 어떻게 약점을 완벽히 보완하고 상위권 레벨로 도약할 수 있는지 희망적이고 확신에 찬 보완 계획을 제시할 것 (4~5문장 내외).
+
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
                     "student_name": "학생 이름",
-                    "report_month": "해당 월/회차 (예: 2026년 6월분)",
+                    "school_name": "다니는 학교명 (텍스트에 없으면 공란)",
+                    "student_grade": "학년 (예: 중등 2학년 / 고등 1학년)",
+                    "report_month": "오늘 날짜 또는 테스트 시행 월",
                     "score": "종합 성취 점수(숫자만)",
-                    "average_score": "반 평균 점수(숫자만)",
                     "chapters": [
-                        {"name": "단원명1", "achievement": "성취도(숫자)"},
-                        {"name": "단원명2", "achievement": "성취도(숫자)"}
+                        {"name": "분석 단원명 1", "achievement": "성취도 숫자"},
+                        {"name": "분석 단원명 2", "achievement": "성취도 숫자"}
                     ],
-                    "weak_types": ["오답률 높은 취약 유형 1", "유형 2", "유형 3"],
-                    "teacher_comment": "학습 태도 및 향후 보완 계획 코멘트 (3~4문장)"
+                    "difficulty": {
+                        "상": "최상 및 상 난이도 문항 정답률 숫자",
+                        "중": "중 난이도 문항 정답률 숫자",
+                        "하": "하 난이도 문항 정답률 숫자"
+                    },
+                    "teacher_comment": "친절한 환영 인사 + 학생의 현재 단원별 분석 점검 + 코넬수학만의 밀착 케어 방안을 담은 종합 안내 문구"
                 }
                 """
                 response = client.chat.completions.create(
@@ -177,10 +219,9 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                # [수정완료] 리스트 객체의 첫 번째 인덱스[0] 명시
                 ai_content = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_content)
-                st.success("AI 데이터 분석 완료!")
+                st.success("🎉 코넬 정밀 분석 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
@@ -188,27 +229,36 @@ if uploaded_file is not None:
         res = st.session_state['parsed_data']
         
         st.markdown("---")
-        st.subheader("🎯 AI 데이터 분석 수정")
+        st.subheader("🎯 입학 상담용 결과지 세부 정보 검토 및 수정")
         
-        student_name = st.text_input("학생 이름", value=res.get("student_name", ""))
-        score = st.text_input("종합 점수", value=str(res.get("score", "")))
-        teacher_comment = st.text_area("종합 의견 코멘트 수정", value=res.get("teacher_comment", ""), height=120)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            student_name = st.text_input("학생 이름", value=res.get("student_name", ""))
+        with col2:
+            school_name = st.text_input("학교명", value=res.get("school_name", "○○학교"))
+        with col3:
+            student_grade = st.text_input("학년", value=res.get("student_grade", "학년"))
+            
+        score = st.text_input("종합 점수", value=str(res.get("score", "0")))
+        teacher_comment = st.text_area("🦅 코넬 분석 Comment (상담 방향에 맞게 편집 가능)", value=res.get("teacher_comment", ""), height=150)
         
         res["student_name"] = student_name
+        res["school_name"] = school_name
+        res["student_grade"] = student_grade
         res["score"] = score
         res["teacher_comment"] = teacher_comment
         
         st.markdown("---")
-        st.subheader("🖨️ 학원 성적표 PDF 인쇄 파일 생성")
+        st.subheader("🖨️ 레벨테스트 인쇄 파일 발행")
         
         try:
             pdf_data = create_academy_report(res)
             st.download_button(
-                label="📥 학원 성적표 PDF 다운로드 (A4 규격)",
+                label="📥 코넬수학 레벨테스트 결과지 PDF 다운로드",
                 data=pdf_data,
-                file_name=f"{student_name}_학원_성적표.pdf",
+                file_name=f"{student_name}_코넬수학_레벨테스트_결과지.pdf",
                 mime="application/pdf"
             )
-            st.info("💡 다운로드한 PDF 파일을 열어 인쇄하시면 A4 용지에 맞게 한글이 깨끗하게 출력됩니다.")
+            st.info("💡 다운로드한 고품질 PDF를 열어 인쇄(A4 세로)하시면 학부모 상담용 프리미엄 결과지가 즉시 출력됩니다.")
         except Exception as pdf_err:
-            st.error(f"PDF 디자인 생성 중 오류 발생: {pdf_err}")
+            st.error(f"PDF 렌더링 중 디자인 에러 발생: {pdf_err}")
