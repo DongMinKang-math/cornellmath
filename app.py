@@ -5,7 +5,7 @@ import json
 import io
 import os
 
-# PDF 생성 및 정밀 드로잉을 위한 부품 임포트
+# PDF 생성 및 새로운 뷰어 라이브러리 임포트
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -84,8 +84,10 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
+    # 잘림 현상을 막기 위해 나눗셈 수식 구조로 테이블 넓이 가변 정의 (총합 515pt)
     w_info = [515 / 6] * 6
     w_ch = [515 * 0.75, 515 * 0.25]
+    w_diff = [85, 150, 280]
     w_comment = [515]
     
     info_data = [
@@ -220,7 +222,6 @@ if uploaded_file is not None:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
                 
-                # 가독성이 무너진 외계어 상태의 데이터라도 매쓰플랫의 고유 배치 인덱스 구조를 유지하도록 페이지화 결합
                 for idx, page in enumerate(reader.pages, 1):
                     text = page.extract_text()
                     if text:
@@ -228,16 +229,15 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 
-                # [해결 핵심] 깨진 인코딩 매커니즘을 복구하기 위해 LLM에게 폰트 복원 바인딩 임무 부여 및 3중 윤문 지침 적용
                 system_prompt = """
                 너는 매쓰플랫 시스템 보고서의 파일 구조와 특수 한글 암호화 폰트 체계를 완벽하게 지식으로 갖고 있는 인코딩 복구 AI 전문가이자 코넬수학의 입학상담 실장이야.
 
                 [현상 정보 및 조치 지침]:
                 1. 현재 입력으로 주어지는 텍스트 데이터는 매쓰플랫 내부 서체의 특수 암호화 배치 때문에 한글 자음/모음이 꼬이거나 외계어 형태로 깨져서 보일 수 있어.
                 2. 너는 글자 자체에 매몰되지 말고, 매쓰플랫 레벨테스트지의 고유 데이터 정렬 패턴(점수, 단원 레이아웃, 난이도 테이블 배치 구조)을 해독하여 정상적인 한국어 정보로 변환(역인코딩)해야 해.
-                3. 특히 [PAGE 4] 및 세부 영역에 표기된 '대표 취약 유형' 또는 '오답률이 높은 유형'의 깨진 단어 구조를 올바른 대한민국 교과과정 수학 단원명(예: 일차방정식의 활용, 삼각형의 성질 등)으로 복구하여 원문 발췌 가치와 동일하게 정제해줘.
+                3. 특히 [PAGE 4] 및 세부 영역에 표기된 '대표 취약 유형' 또는 '오답률이 높은 유형'의 깨진 단어 구조를 올바른 대한민국 교과과정 수학 단원명(예: 일차방정식의 활용, 삼각형의 성질 등)으로 복구하여 원문 발췌 가치와 동일하게 정제해줘. (지어내지 마라)
                 4. difficulty 수치 파싱: 난이도별 정답률은 임의 유추하지 말고, 배치 테이블에서 매칭된 값을 추출해줘.
-                5. teacher_comment 고도화: '코넬수학에 관심을 가지고 진단에 응해주어 감사하다'는 첫인사 후, 약점을 보완하여 성적을 끌어올릴 수 있는 정중하고 매끄러운 코멘트를 3중 자체 검증하여 작성해줘.
+                5. teacher_comment 고도화: '코넬수학에 관심을 가지고 진단에 응해주어 감사하다'는 첫인사 후, 약점을 보완하여 성적을 끌어올릴 수 있는 정중하고 매끄러운 코멘트를 3중 자체 검증하여 작성해줘 (4~5문장).
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
@@ -267,7 +267,8 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices.message.content
+                # [오류 완전 박멸] choices 리스트의 0번째 객체를 명시하여 컴파일 오류 해결
+                ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 데이터 인코딩 보정 및 발췌 완료!")
             except Exception as e:
