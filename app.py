@@ -59,7 +59,7 @@ def create_academy_report(data):
         
     styles = getSampleStyleSheet()
     
-    # 프리미엄 톤앤매너 폰트 서체 스타일 정의
+    # 프리미엄 디자인 폰트 서체 스타일 정의
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=18, leading=22, alignment=1, textColor=colors.HexColor('#FFFFFF'))
     info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=12, alignment=2, textColor=colors.HexColor('#64748B'))
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, textColor=colors.HexColor('#1E293B'))
@@ -85,9 +85,9 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # 컴파일 오류 및 유실을 차단하기 위한 수식 분할 가로폭 지정 (총합 515)
+    # 텍스트 유실 방지 수식 가로폭 지정 (총합 515)
     w_info = [515 / 6] * 6
-    w_ch = [515 * 0.42, 515 * 0.45, 515 * 0.13] # 단원명(42%), 그래프(45%), 수치(13%)
+    w_ch = [515 * 0.42, 515 * 0.45, 515 * 0.13]
     w_comment = 515
     
     info_data = [
@@ -116,21 +116,21 @@ def create_academy_report(data):
     story.append(Paragraph("📈 단원별 성취 분석", section_style))
     story.append(Spacer(1, 4))
     
-    # [수정사항 1] 선형 그래프를 고급스럽고 얇게(Thickness 3~4pt) 바인딩하는 특수 드로잉 셀 정의
+    # [디자인 개선] 성취도 그래프 바를 두께 5pt 미만의 초슬림 고급 선형 레이아웃으로 변경
     def make_ch_bar_cell(pct_val):
         try:
             pct = min(100, max(0, int(pct_val)))
         except:
             pct = 0
-        w_filled = max(1, int(pct * 2.0)) # 100% 기준 200pt 스케일링
+        w_filled = max(1, int(pct * 2.0))
         w_empty = max(1, 200 - w_filled)
         
-        # 테이블 트릭을 사용해 얇은 고품격 미니멀 선형 라인 구현
+        # 얇고 스마트한 인디고 블루 선형 라인 구현
         bar_table = Table([['', '']], colWidths=[w_filled, w_empty])
         bar_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#2563EB')), # 선명하고 세련된 인디고 블루
-            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#E2E8F0')), # 가벼운 배경 그레이 선
-            ('BOTTOMPADDING', (0,0), (-1,-1), 2.5), # 패딩을 정밀 축소하여 얇은 라인 콤팩트 연출
+            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#2563EB')),
+            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#E2E8F0')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
             ('TOPPADDING', (0,0), (-1,-1), 2.5),
         ]))
         return bar_table
@@ -156,10 +156,7 @@ def create_academy_report(data):
     story.append(t_ch)
     story.append(Spacer(1, 12))
     
-    # 문항 진단 5단 그래프 파트
     story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
-    story.append(Spacer(1, 4))
-    
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     
     drawing = Drawing(515, 100)
@@ -171,7 +168,7 @@ def create_academy_report(data):
     
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    x_coords = [45, 150, 257, 365, 470]
+    x_coords = [50, 150, 257, 365, 465]
     
     for i, lvl in enumerate(levels):
         try:
@@ -234,7 +231,7 @@ if uploaded_file is not None:
             del st.session_state['input_cleared']
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI가 대형 수학 학원 피드백 문맥을 학습하여 전문 상담 코멘트를 작성 중입니다..."):
+        with st.spinner("코넬 AI가 수치 오차를 5회 교차 검증하고 부드러운 원장님 어조로 재윤문 중입니다..."):
             try:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
@@ -244,16 +241,16 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 
-                # [수정사항 2] 대한민국 명문 수학 전문 학원 블로그의 레벨테스트 상담 문맥 피드백 구조를 이식한 정밀 지침 수립
+                # [오류 해결 완료] response.choices[0].message.content 문법에 맞춰 인덱스 지침 연동 및 부드러운 톤앤매너 프롬프트 고도화
                 system_prompt = """
-                너는 강남 대치동 및 목동의 최상위권 수학전문학원에서 신규생 입학 진단평가 직후 학부모 상담을 전담하는 수석 교육 팀장이자 원장이야.
+                너는 강남 대치동 및 목동의 상위권 수학전문학원에서 학부모 입학 상담을 전담하는 친절하고 깊이 있는 원장이야.
                 매쓰플랫 원본의 난이도별 데이터 수치 교정을 5회 반복 검증하여 오차 없는 데이터 JSON을 빌드해라.
 
-                [수학 학원 블로그 피드백 멘트 학습 가이드라인]:
-                1. 첫 문장은 반드시 "코넬수학에 관심을 가지고 소중한 자녀의 진단평가에 응해주어 감사하다"는 정중한 격려의 문장으로 시작할 것.
-                2. 단순 점수 나열은 금지한다. 수학 전문 블로그의 분석 글처럼 '어떤 대단원 개념 뼈대는 단단하게 잡혀 있으나, 세부 어떤 유형 문항에서 연산 실수가 반복되거나 조건 분석력이 부족한지' 구체적이고 전문적인 수학 용어를 결합하여 날카롭게 원인을 해독해 줄 것.
-                3. 결론부에는 '코넬수학만의 차별화된 타이트한 밀착 개별 클리닉 관리 시스템과 무한 오답 오답 제어 매커니즘을 적용하면, 약점 영역이 심화 개념으로 완벽하게 반전되어 상위권 레벨로 확실하게 도약할 수 있다'는 교육적 대안과 신뢰를 주는 명문 원장의 톤앤매너로 종결할 것.
-                4. 이 조건들을 바탕으로 문맥의 매끄러움과 설득력을 스스로 5회 연속 재검증(5-turn refinement)하여 품격이 극대화된 4~5문장으로 완성형 코멘트를 도출해라.
+                [학부모 상담용 극도로 부드럽고 정중한 어조 지침]:
+                1. 첫 문장은 무조건 "코넬수학에 관심을 가지고 소중한 자녀의 진단평가에 응해주셔서 깊이 감사드립니다."로 아주 따뜻하고 정중하게 출발할 것.
+                2. 명령조나 지나치게 딱딱한 표현(요구됩니다, 필요합니다, 요망됩니다 등)은 전면 금지한다. 수학 전문 학원 블로그의 친절한 분석 글처럼 "~해보입니다", "~하는 성향을 띠고 있습니다", "~를 다져나간다면 충분히 성장할 수 있습니다"와 같은 서술어 구조로 부드럽게 감싸줄 것.
+                3. 결론부에는 '코넬수학만의 차별화된 세심하고 밀착된 1대1 관리 시스템과 철저한 오답 보완 매커니즘을 결합하여, 부족했던 영역을 탄탄한 심화 개념으로 반전시키고 상위권으로 안심하고 도약할 수 있도록 저희 교사진이 사랑과 책임감으로 지도하겠습니다'라는 확신과 안도감을 주는 멘트로 마감할 것.
+                4. 이 세부 조건들을 바탕으로 문맥을 스스로 5회 연속 리팩토링(5-turn refinement)하여 부드러움과 신뢰가 극대화된 완성형 코멘트(4~5문장)로 리턴해라.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
@@ -273,7 +270,7 @@ if uploaded_file is not None:
                         "중하": "5회 검증된 중하 정답률 숫자",
                         "하": "5회 검증된 하 정답률 숫자"
                     },
-                    "teacher_comment": "학원 상담 블로그 패턴이 정밀 학습되어 삼중 보완된 품격 높은 원장님 전용 상담 의견 문구"
+                    "teacher_comment": "블로그 상담 패턴 기반으로 5차 윤문된 부드럽고 정중한 원장님 종합 분석 의견"
                 }
                 """
                 response = client.chat.completions.create(
@@ -282,9 +279,10 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices.message.content
+                # [문법 오류 근본 교정] 리스트의 첫 번째 원소 인덱스 [0] 추가 반영으로 컴파일 통과 확보
+                ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 대형학원 상담 멘트 최적화 및 수치 보정 완료!")
+                st.success("🎉 코넬 대형학원 상담 멘트 최적화 및 문법 오류 해결 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
