@@ -14,15 +14,11 @@ from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# 웹 페이지 설정
-st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", layout="centered")
+# 웹 페이지 설정 (브라우저 탭 아이콘을 📊 모양으로 고정)
+st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", page_icon="📊", layout="centered")
 
-# [수정사항 1] 메인 홈페이지 상단에 로고 삽입
-logo_filename = "cornell.png"
-if os.path.exists(logo_filename):
-    st.image(logo_filename, width=180)
-
-st.title("🦅 코넬수학전문학원 레벨테스트 결과지 시스템")
+# [수정사항 1] 메인 홈페이지 로고 삭제 및 타이틀 📊 아이콘 적용
+st.title("📊 코넬수학전문학원 레벨테스트 결과지 시스템")
 st.caption("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
 st.markdown("---")
 
@@ -76,6 +72,7 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
+    w_info = [65, 105, 65, 105, 55, 115]
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_center), Paragraph(data.get('student_name', ''), body_style),
          Paragraph('<b>학 교 명</b>', body_center), Paragraph(data.get('school_name', ''), body_style),
@@ -85,7 +82,7 @@ def create_academy_report(data):
          Paragraph('', body_style), Paragraph('', body_style)]
     ]
     
-    t_info = Table(info_data, colWidths=[70, 100, 70, 100, 70, 100])
+    t_info = Table(info_data, colWidths=w_info)
     t_info.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,1), colors.HexColor('#F1F5F9')),
         ('BACKGROUND', (2,0), (2,1), colors.HexColor('#F1F5F9')),
@@ -103,11 +100,12 @@ def create_academy_report(data):
     story.append(Paragraph("📈 단원별 평가 분석", section_style))
     story.append(Spacer(1, 6))
     
+    w_ch = [380, 130]
     ch_rows = [[Paragraph('<b>평가 단원 영역</b>', body_center), Paragraph('<b>성취도 (%)</b>', body_center)]]
     for ch in data.get("chapters", []):
         ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(f"{ch['achievement']}%", body_center)])
         
-    t_ch = Table(ch_rows, colWidths=[380, 130])
+    t_ch = Table(ch_rows, colWidths=w_ch)
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
@@ -121,13 +119,14 @@ def create_academy_report(data):
     story.append(Paragraph("📊 문항 난이도별 정답률 분석", section_style))
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "하": "0"})
     
+    w_diff = [100, 80, 330]
     diff_data = [
         [Paragraph('<b>난이도</b>', body_center), Paragraph('<b>정답률</b>', body_center), Paragraph('<b>취약도 진단</b>', body_center)],
         [Paragraph('최상 / 상', body_style), Paragraph(f"{st_diff.get('상', '0')}%", body_center), Paragraph('심화 개념 및 고난도 문제해결력 진단', body_style)],
         [Paragraph('중', body_style), Paragraph(f"{st_diff.get('중', '0')}%", body_center), Paragraph('응용 문제 및 핵심 유형 적용력 진단', body_style)],
         [Paragraph('하', body_style), Paragraph(f"{st_diff.get('하', '0')}%", body_center), Paragraph('기본 개념 및 기초 계산 능력 진단', body_style)]
     ]
-    t_diff = Table(diff_data, colWidths=[90, 80, 340])
+    t_diff = Table(diff_data, colWidths=w_diff)
     t_diff.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (2,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
@@ -141,8 +140,9 @@ def create_academy_report(data):
     story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
     story.append(Spacer(1, 6))
     
+    w_comment = [510]
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
-    t_comment = Table(comment_box, colWidths=[510])
+    t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
@@ -155,6 +155,7 @@ def create_academy_report(data):
     
     def add_footer_logo(canvas, doc):
         canvas.saveState()
+        logo_filename = "cornell.png"
         if os.path.exists(logo_filename):
             try:
                 canvas.drawImage(logo_filename, 237, 20, width=120, height=30, mask='auto')
@@ -173,7 +174,6 @@ if uploaded_file is not None:
         st.session_state['current_file'] = uploaded_file.name
         if 'parsed_data' in st.session_state:
             del st.session_state['parsed_data']
-        # 초기 공백 설정을 위한 세션 플래그 리셋
         if 'input_cleared' in st.session_state:
             del st.session_state['input_cleared']
 
@@ -188,13 +188,9 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 system_prompt = """
-                너는 코넬수학전문학원의 전문 입학상담 실장이자 교육 분석가야. 
-                제공된 매쓰플랫 테스트 결과 텍스트에서 데이터를 추출하고, '새로 학원을 등록하려는 신규 학생과 학부모'를 타겟으로 정중하고 친절하면서도 학원의 전문성이 돋보이는 분석 JSON을 작성해줘.
-
-                [분석 가이드라인]:
-                - teacher_comment 작성 시: "코넬수학에 문을 두드려주어 감사하다"는 취약 극복 독려 인사를 할 것.
-                - 학생이 어떤 대단원에서 강점과 약점을 보이는지 텍스트 기반으로 날카롭게 짚어줄 것.
-                - 향후 코넬수학의 정밀 커리큘럼을 통해 어떻게 약점을 보완하고 레벨을 도약할 수 있는지 지도 계획을 제시할 것 (4~5문장 내외).
+                너는 코넬수학전문학원의 전문 입학상담 실장이야. 
+                매쓰플랫 테스트 결과 텍스트에서 데이터를 추출하고, 신규 학생과 학부모를 타겟으로 정중하고 친절하면서도 학원의 전문성이 돋보이는 분석 JSON을 작성해줘.
+                종합 코멘트는 "코넬수학에 문을 두드려주어 감사하다"는 환영 인사로 시작하고 단원별 장단점 점검 및 코넬수학만의 케어 방안을 친절하게 풀어서 4~5문장으로 써줘.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
@@ -221,8 +217,8 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_content = response.choices.message.content
-                st.session_state['parsed_data'] = json.loads(ai_content)
+                ai_raw_data = response.choices[0].message.content
+                st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 정밀 분석 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
@@ -230,7 +226,6 @@ if uploaded_file is not None:
     if 'parsed_data' in st.session_state:
         res = st.session_state['parsed_data']
         
-        # [수정사항 2] 최초 1회만 학생 정보를 완전한 빈칸(공백)으로 강제 초기화 처리
         if 'input_cleared' not in st.session_state:
             res["student_name"] = ""
             res["school_name"] = ""
@@ -248,7 +243,6 @@ if uploaded_file is not None:
         with col3:
             student_grade = st.text_input("학년 입력", value=res.get("student_grade", ""))
             
-        # [수정사항 3] 종합 점수 화면 수정 불가능(disabled) 처리
         score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
         teacher_comment = st.text_area("🦅 코넬 분석 Comment (상담 방향에 맞게 편집 가능)", value=res.get("teacher_comment", ""), height=150)
         
@@ -258,11 +252,9 @@ if uploaded_file is not None:
         res["score"] = score
         res["teacher_comment"] = teacher_comment
         
-        # PDF 미리 빌드
         try:
             pdf_data = create_academy_report(res)
             
-            # [수정사항 4] 실시간 미리보기 기능 구현 (PDF를 Base64 인코딩하여 iframe 뷰어로 화면 임베딩)
             st.markdown("---")
             st.subheader("👀 결과지 실시간 미리보기")
             
