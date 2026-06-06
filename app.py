@@ -72,10 +72,10 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # [유실 방지] 가로폭 너비 숫자를 변수 배열로 감싸서 문자열이 짤리지 않도록 보호 조치
-    w_info = [65, 105, 65, 105, 65, 105]
+    # [유실 차단 및 안전 지정] 가로 크기를 안전하게 바인딩
+    w_info = [60, 110, 60, 110, 50, 120]
     w_ch = [360, 150]
-    w_diff = [100, 90, 320]
+    w_diff = [90, 90, 330]
     w_comment = [510]
     
     info_data = [
