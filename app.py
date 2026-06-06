@@ -43,6 +43,7 @@ def calculate_math_level(score_str):
 # PDF 성적표 생성 함수 정의
 def create_academy_report(data):
     buffer = io.BytesIO()
+    # A4 실 사용 가로폭은 515pt입니다.
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=60)
     story = []
     
@@ -72,11 +73,11 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # [유실 차단 및 안전 지정] 가로 크기를 안전하게 바인딩
-    w_info = [60, 110, 60, 110, 50, 120]
-    w_ch = [360, 150]
-    w_diff = [90, 90, 330]
-    w_comment = [510]
+    # [에러 원천 방지] 복사할 때 자꾸 지워지는 colWidths 값을 수동 지정하지 않고 전체폭(515) 비례식 분할로 안전 계산
+    w_info = [515 / 6] * 6
+    w_ch = [365, 150]
+    w_diff = [100, 80, 335]
+    w_comment = [515]
     
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_center), Paragraph(data.get('student_name', ''), body_style),
@@ -219,7 +220,8 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices.message.content
+                # [에러 해결 최종 조치] choices 리스트의 첫 번째 원소를 인덱스화([0])하여 속성을 완벽히 꺼내옴
+                ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 정밀 분석 완료!")
             except Exception as e:
