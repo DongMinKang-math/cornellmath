@@ -29,7 +29,6 @@ except Exception:
 # PDF 성적표 생성 함수 정의
 def create_academy_report(data):
     buffer = io.BytesIO()
-    # 좌우 여백 40pt 적용 (A4 전체 폭은 595pt, 실제 사용 가능 폭은 515pt)
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     story = []
     
@@ -55,13 +54,12 @@ def create_academy_report(data):
     story.append(Paragraph(f"<b>분석 기준일:</b> {data.get('report_month', '이번 달')}", info_style))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#1E3A8A'), spaceBefore=5, spaceAfter=20))
     
-    # [수정 완료] 학생 기본 정보 표 너비 지정 (총합 540pt로 A4 폭에 딱 맞춤)
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_style), Paragraph(data.get('student_name', ''), body_style),
          Paragraph('<b>종합 점수</b>', body_style), Paragraph(f"{data.get('score', '')}점", body_style),
          Paragraph('<b>반 평 균</b>', body_style), Paragraph(f"{data.get('average_score', '')}점", body_style)]
     ]
-    t_info = Table(info_data, colWidths=[80, 100, 80, 100, 80, 100])
+    t_info = Table(info_data, colWidths=[70, 110, 70, 110, 70, 110])
     t_info.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F1F5F9')),
         ('BACKGROUND', (2,0), (2,0), colors.HexColor('#F1F5F9')),
@@ -82,7 +80,6 @@ def create_academy_report(data):
     for ch in data.get("chapters", []):
         ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(str(ch['achievement']), body_style)])
         
-    # [수정 완료] 단원별 성취도 표 너비 지정 (총합 440pt)
     t_ch = Table(ch_rows, colWidths=[340, 100])
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E2E8F0')),
@@ -104,9 +101,8 @@ def create_academy_report(data):
     story.append(Paragraph("📝 학원 지도 및 종합 의견", section_style))
     story.append(Spacer(1, 5))
     
-    # [수정 완료] 코멘트 박스 전체 폭 지정 (선 내부 글자 잘림 방지)
     comment_box = [[Paragraph(data.get('teacher_comment', '내용 없음'), body_style)]]
-    t_comment = Table(comment_box, colWidths=[515])
+    t_comment = Table(comment_box, colWidths=[540])
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1, colors.HexColor('#94A3B8')),
@@ -128,8 +124,14 @@ def create_academy_report(data):
 uploaded_file = st.file_uploader("매쓰플랫 보고서 PDF 파일을 업로드하세요", type=["pdf"])
 
 if uploaded_file is not None:
+    # 파일이 새로 업로드되면 기존 세션을 초기화하여 에러 캐싱 방지
+    if 'current_file' not in st.session_state or st.session_state['current_file'] != uploaded_file.name:
+        st.session_state['current_file'] = uploaded_file.name
+        if 'parsed_data' in st.session_state:
+            del st.session_state['parsed_data']
+
     if 'parsed_data' not in st.session_state:
-        with st.spinner("PDF 추출 및 AI 분석을 최초 1회 실행합니다..."):
+        with st.spinner("PDF 추출 및 AI 분석을 실행합니다..."):
             try:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
@@ -160,8 +162,8 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                # [수정 완료] 최신 openai 문법 적용으로 데이터 추출 안전화
-                ai_content = response.choices.message.content
+                # [오류 해결 핵심 부분] choices 리스트의 첫 번째 원소[0]를 명확히 지정하여 대괄호 인덱싱 처리
+                ai_content = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_content)
                 st.success("AI 데이터 분석 완료!")
             except Exception as e:
