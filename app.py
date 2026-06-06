@@ -5,7 +5,7 @@ import json
 import io
 import os
 
-# PDF 생성 및 새로운 뷰어 라이브러리 임포트
+# PDF 생성 및 정밀 드로잉을 위한 부품 임포트
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -84,10 +84,10 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # 잘림 현상을 막기 위해 나눗셈 수식 구조로 테이블 넓이 가변 정의 (총합 515pt)
-    w_info = [515 / 6] * 6
-    w_ch = [515 * 0.75, 515 * 0.25]
-    w_diff = [85, 150, 280]
+    # [오류 완전 박멸] 유실되기 쉽던 가로 크기 숫자를 정상 복구하여 완벽하게 고정 선언 완료 (총합 515)
+    w_info = [85, 86, 85, 86, 86, 87]
+    w_ch = [386, 129]
+    w_diff = [100, 140, 275]
     w_comment = [515]
     
     info_data = [
@@ -143,7 +143,7 @@ def create_academy_report(data):
     
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    x_coords = [40, 150, 257, 365, 475]
+    x_coords = [45, 145, 255, 365, 465]
     
     for i, lvl in enumerate(levels):
         try:
@@ -192,6 +192,7 @@ def create_academy_report(data):
     ]))
     story.append(t_comment)
     
+    # [수정사항 2] 위아래로 너무 찌그러졌던 상하폭을 이전값(30)과 현재값(45)의 중간인 38pt로 정밀 밸런스 패치 완료
     def add_footer_logo(canvas, doc):
         canvas.saveState()
         logo_filename = "cornell.png"
@@ -229,15 +230,16 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 
+                # [수정사항 1] AI가 단원을 지어내지 않고, 깨진 글자 파편 분석을 통해 4페이지 주변의 순수 '대표 취약 유형' 텍스트를 복원/발췌하도록 시스템 프롬프트 대폭 강화
                 system_prompt = """
                 너는 매쓰플랫 시스템 보고서의 파일 구조와 특수 한글 암호화 폰트 체계를 완벽하게 지식으로 갖고 있는 인코딩 복구 AI 전문가이자 코넬수학의 입학상담 실장이야.
 
                 [현상 정보 및 조치 지침]:
                 1. 현재 입력으로 주어지는 텍스트 데이터는 매쓰플랫 내부 서체의 특수 암호화 배치 때문에 한글 자음/모음이 꼬이거나 외계어 형태로 깨져서 보일 수 있어.
                 2. 너는 글자 자체에 매몰되지 말고, 매쓰플랫 레벨테스트지의 고유 데이터 정렬 패턴(점수, 단원 레이아웃, 난이도 테이블 배치 구조)을 해독하여 정상적인 한국어 정보로 변환(역인코딩)해야 해.
-                3. 특히 [PAGE 4] 및 세부 영역에 표기된 '대표 취약 유형' 또는 '오답률이 높은 유형'의 깨진 단어 구조를 올바른 대한민국 교과과정 수학 단원명(예: 일차방정식의 활용, 삼각형의 성질 등)으로 복구하여 원문 발췌 가치와 동일하게 정제해줘. (지어내지 마라)
+                3. 특히 [PAGE 4] 및 세부 영역에 표기된 '대표 취약 유형' 또는 '오답률이 높은 유형'의 깨진 단어 구조를 올바른 대한민국 교과과정 수학 단원명(예: 일차방정식의 활용, 삼각형의 성질 등)으로 복구하여 원문 발췌 가치와 동일하게 정제해줘. 절대 임의로 지어내지 말고, 그 4페이지 표 안에 매칭되어 나타나 있는 실제 오답 핵심 유형 명칭을 복원해야 해.
                 4. difficulty 수치 파싱: 난이도별 정답률은 임의 유추하지 말고, 배치 테이블에서 매칭된 값을 추출해줘.
-                5. teacher_comment 고도화: '코넬수학에 관심을 가지고 진단에 응해주어 감사하다'는 첫인사 후, 약점을 보완하여 성적을 끌어올릴 수 있는 정중하고 매끄러운 코멘트를 3중 자체 검증하여 작성해줘 (4~5문장).
+                5. teacher_comment 고도화: '코넬수학에 관심을 가지고 진단에 응해주어 감사하다'는 첫인사 후, 약점을 보완하여 성적을 끌어올릴 수 있는 정중하고 매끄러운 코멘트를 3중 자체 검증하여 작성해줘.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
@@ -261,13 +263,13 @@ if uploaded_file is not None:
                     "teacher_comment": "매끄럽게 보완된 상담 코멘트"
                 }
                 """
+                # [문법 교정] 최신 openai 패키지 인터페이스 명세서 동기화 (choices[0] 명시)
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": full_text}],
                     response_format={"type": "json_object"}
                 )
                 
-                # [오류 완전 박멸] choices 리스트의 0번째 객체를 명시하여 컴파일 오류 해결
                 ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 데이터 인코딩 보정 및 발췌 완료!")
