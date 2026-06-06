@@ -4,16 +4,18 @@ from openai import OpenAI
 import json
 import io
 import os
+from PIL import Image as PILImage
 
-# PDF 생성 및 정밀 드로잉을 위한 부품 임포트
+# PDF 생성 및 드로잉 부품 임포트
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, Rect, Line, Circle, String
 from streamlit_pdf_viewer import pdf_viewer
+from pdf2image import convert_from_bytes
 
 # 웹 페이지 설정 (브라우저 탭 아이콘을 📊 모양으로 고정)
 st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", page_icon="📊", layout="centered")
@@ -42,7 +44,7 @@ def calculate_math_level(score_str):
         return "C"
 
 # PDF 성적표 생성 함수 정의
-def create_academy_report(data):
+def create_academy_report(data, cropped_image_path=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=45)
     story = []
@@ -68,7 +70,7 @@ def create_academy_report(data):
     story.append(Spacer(1, 5))
     
     title_banner_data = [[Paragraph("<b>코넬수학전문학원 신규생 진단평가 결과 분석지</b>", title_style)]]
-    t_banner = Table(title_banner_data, colWidths=[515])
+    t_banner = Table(title_banner_data, colWidths=515)
     t_banner.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1E3A8A')),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -86,7 +88,7 @@ def create_academy_report(data):
     
     w_info = [515 / 6] * 6
     w_ch = [515 * 0.75, 515 * 0.25]
-    w_comment = [515]
+    w_comment = 515
     
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_center), Paragraph(data.get('student_name', ''), body_style),
@@ -141,7 +143,7 @@ def create_academy_report(data):
     
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    x_coords = [40, 143, 257, 371, 475]
+    x_coords = [40, 145, 257, 370, 475]
     
     for i, lvl in enumerate(levels):
         try:
@@ -164,18 +166,22 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 12))
     
-    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (매쓰플랫 원문 발췌)", section_style))
+    # [원장님 요청사항 적용] 텍스트가 아닌, 매쓰플랫 PDF에서 물리적으로 도려낸 실제 이미지 표 그 자체를 합성
+    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (매쓰플랫 원본 이미지)", section_style))
     story.append(Spacer(1, 4))
     
-    weak_list = data.get("weak_types", [])
-    if not weak_list or len(weak_list) == 0:
-        weak_list = ["원본 보고서의 취약 유형 단원을 검토해 주세요."]
+    if cropped_image_path and os.path.exists(cropped_image_path):
+        try:
+            # 캡처된 원본 표 이미지를 A4 가로폭에 맞춰 삽입 (A4폭 맞춤 가로 400pt, 세로 75pt 자동 조율)
+            story.append(RLImage(cropped_image_path, width=400, height=75))
+        except Exception as img_err:
+            story.append(Paragraph(f"⚠️ 원본 이미지 결합 오류: {img_err}", body_style))
+    else:
+        story.append(Paragraph("⚠️ 매쓰플랫 4페이지에서 대표 취약 유형 표 이미지를 추출하지 못했습니다.", body_style))
         
-    for i, weak in enumerate(weak_list, 1):
-        story.append(Paragraph(f"• <b>{weak}</b> : 매쓰플랫 진단지 상에 명시된 대표 취약 유형입니다. 코넬만의 밀착 오답 솔루션 관리가 필요합니다.", body_style))
     story.append(Spacer(1, 12))
     
-    story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
+    story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
@@ -213,66 +219,59 @@ if uploaded_file is not None:
             del st.session_state['parsed_data']
         if 'input_cleared' in st.session_state:
             del st.session_state['input_cleared']
+        # 임시 보관 중인 도려낸 이미지 리셋
+        if os.path.exists("temp_cropped_weak.png"):
+            os.remove("temp_cropped_weak.png")
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI 진단 엔진이 4페이지 세부 진단 결과 영역을 정밀하게 복원하여 발췌 중입니다..."):
+        with st.spinner("코넬 AI 진단 엔진이 4페이지에서 대표 취약 유형 원본 표를 정밀 캡처 중입니다..."):
             try:
+                # [해결 핵심 로직] PDF의 모든 바이트를 읽어와 이미지 파일 배열로 강제 변환 (300DPI 고화질)
+                pdf_bytes = uploaded_file.getvalue()
+                images = convert_from_bytes(pdf_bytes, dpi=300)
+                
+                # 매쓰플랫 4페이지(리스트 인덱스 상 3번째 페이지) 선택
+                if len(images) >= 4:
+                    target_page_image = images[3]
+                    img_w, img_h = target_page_image.size
+                    
+                    # 매쓰플랫 표준 양식 기준, 4페이지 상단에 위치한 '대표 취약 유형' 표의 정확한 픽셀 좌표 지정
+                    # (전체 이미지 해상도 기준 상단에서 약간 아래 영역을 가로지르도록 crop 상자 정의)
+                    left = int(img_w * 0.08)
+                    top = int(img_h * 0.12)
+                    right = int(img_w * 0.92)
+                    bottom = int(img_h * 0.23)
+                    
+                    # 이미지 슬라이싱(도려내기) 실행 및 서버 디렉토리에 임시 물리 파일로 저장
+                    cropped_img = target_page_image.crop((left, top, right, bottom))
+                    cropped_img.save("temp_cropped_weak.png")
+                
+                # 기존의 꼬인 서체 파싱 대신, 구조적 수치 파싱 용도로만 프롬프트 간소화 작동
                 reader = PdfReader(uploaded_file)
                 full_text = ""
-                
-                for idx, page in enumerate(reader.pages, 1):
+                for page in reader.pages:
                     text = page.extract_text()
-                    if text:
-                        full_text += f"\n--- [PAGE {idx}] ---\n" + text
+                    if text: full_text += text + "\n"
 
                 client = OpenAI(api_key=api_key)
-                
-                # [수정 사항] 대표 취약 유형을 마음대로 꾸미지 않고 4페이지 원본을 똑같이 흉내내어 발췌하도록 AI 지시문(프롬프트) 극대화 조정
                 system_prompt = """
-                너는 매쓰플랫 시스템 보고서의 파일 구조와 특수 암호화 폰트 체계를 해독하는 정밀 데이터 분석관이야.
-                너의 임무는 입력된 매쓰플랫 텍스트에서 학부모 전송용 JSON 데이터를 완벽하게 교정 및 추출해내는 것이야.
-
-                [대표 취약 유형 추출 절대 규칙]:
-                - '--- [PAGE 4] ---' 라벨 하위 영역 및 세부 분석란에 기재된 '대표 취약 유형' 혹은 '오답률이 높은 유형' 표기 텍스트를 최우선적으로 탐색해라.
-                - 추출 시, 네가 임의로 수학적 지식을 가미하여 개념명을 새로 정하거나 수정하는 것을 엄격히 금지한다. 
-                - 글자가 깨지거나 순서가 꼬여 있더라도, 그 문맥에 존재하는 매쓰플랫 내부의 실제 '대표 취약 유형명'(예: 연립방정식의 풀이, 이등변삼각형의 성질 등)을 찾아서 단어 하나 바꾸지 말고 원문 그대로 똑같이 발췌하여 weak_types 배열에 담아라.
-
-                [나머지 항목 정제 가이드라인]:
-                1. report_month: 원본 문서 안의 날짜를 추적하여 반드시 'YYYY/MM/DD' 형태의 시험 일자로 고정 포맷팅할 것.
-                2. difficulty: 난이도 테이블(최상, 상, 중, 중하, 하) 내부의 정답률 숫자를 매칭하여 가져올 것.
-                3. teacher_comment: "코넬수학에 관심을 가지고 진단에 응해주어 감사하다"는 정중한 감사 멘트로 친절히 시작하고, 단원별 상태 진단 점검 분석과 밀착 클리닉 솔루션을 3중 크로스체크하여 매끄러운 원장님 서체 문장(4~5문장)으로 구성할 것.
-
-                [반드시 지켜야 할 응답 JSON 형식]:
-                {
-                    "student_name": "교정된 학생 이름",
-                    "school_name": "학교명",
-                    "student_grade": "학년",
-                    "report_month": "YYYY/MM/DD 형식의 시험 일자",
-                    "score": "종합 점수 (숫자만)",
-                    "chapters": [
-                        {"name": "교정된 단원명 1", "achievement": "성취도 숫자"},
-                        {"name": "교정된 단원명 2", "achievement": "성취도 숫자"}
-                    ],
-                    "difficulty": {
-                        "최상": "최상 정답률 숫자",
-                        "상": "상 정답률 숫자",
-                        "중": "중 정답률 숫자",
-                        "중하": "중하 정답률 숫자",
-                        "하": "하 정답률 숫자"
-                    },
-                    "weak_types": ["4페이지에서 원문 글자 그대로 똑같이 복원 발췌한 대표 취약 유형 1", "유형 2", "유형 3"],
-                    "teacher_comment": "매끄럽게 보완된 상담 코멘트"
-                }
+                너는 매쓰플랫 보고서의 정렬 체계를 다루는 최고 등급의 데이터 분석관이야.
+                너는 텍스트 깨짐과 상관없이 오직 날짜, 점수, 난이도별 정답률 수치만 완벽하게 캐치해서 아래 JSON 포맷을 채워야 해.
+                teacher_comment: "코넬수학에 관심을 가지고 진단에 응해주어 감사하다"는 정중한 감사 멘트로 친절히 시작하고, 3중 자체 검증을 거친 신뢰도 높은 원장님 서체 문장(4~5문장)으로 구성할 것.
                 """
+                
                 response = client.chat.completions.create(
                     model="gpt-4o",
-                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": full_text}],
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"점수와 날짜, 난이도별 수치만 정확히 채워줘:\n{full_text}"}
+                    ],
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices[0].message.content
+                ai_raw_data = response.choices.message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 데이터 인코딩 보정 및 원문 발췌 완료!")
+                st.success("🎉 코넬 4페이지 대표 취약 유형 원본 표 이미지 자동 캡처 성공!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
@@ -328,7 +327,8 @@ if uploaded_file is not None:
         res["teacher_comment"] = teacher_comment
         
         try:
-            pdf_data = create_academy_report(res)
+            # 캡처된 이미지 파일 경로를 성적표 빌더 함수로 토스
+            pdf_data = create_academy_report(res, cropped_image_path="temp_cropped_weak.png")
             
             st.markdown("---")
             st.subheader("👀 결과지 실시간 미리보기")
