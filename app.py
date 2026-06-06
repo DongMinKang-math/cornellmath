@@ -43,8 +43,8 @@ def calculate_math_level(score_str):
 # PDF 성적표 생성 함수 정의
 def create_academy_report(data):
     buffer = io.BytesIO()
-    # A4 실 사용 가로폭은 515pt입니다.
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=60)
+    # [수정사항 2] 1페이지 안에 쏙 들어가도록 상하 여백을 25pt로 타이트하게 조율
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=40)
     story = []
     
     font_filename = "NANUMGOTHIC.TTF" 
@@ -59,24 +59,25 @@ def create_academy_report(data):
         
     styles = getSampleStyleSheet()
     
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=20, leading=26, alignment=1, textColor=colors.HexColor('#0F172A'))
-    info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=14, alignment=2)
-    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=15)
-    body_center = ParagraphStyle('BodyCenter', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=15, alignment=1)
-    section_style = ParagraphStyle('SectionStyle', parent=styles['Heading2'], fontName=font_name, fontSize=13, leading=17, textColor=colors.HexColor('#1E3A8A'))
+    # [수정사항 3] 타이틀의 폰트 굵기를 굵게(Bold) 지정하고 시인성 향상
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=21, leading=26, alignment=1, textColor=colors.HexColor('#0F172A'))
+    info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=12, alignment=2)
+    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14)
+    body_center = ParagraphStyle('BodyCenter', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, alignment=1)
+    section_style = ParagraphStyle('SectionStyle', parent=styles['Heading2'], fontName=font_name, fontSize=12, leading=16, textColor=colors.HexColor('#1E3A8A'))
     
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 5))
     story.append(Paragraph("<b>코넬수학전문학원 신규생 레벨테스트 결과지</b>", title_style))
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 10))
     story.append(Paragraph(f"<b>진단일:</b> {data.get('report_month', '최근')}", info_style))
-    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#1E3A8A'), spaceBefore=5, spaceAfter=20))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1E3A8A'), spaceBefore=3, spaceAfter=15))
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # [에러 원천 방지] 복사할 때 자꾸 지워지는 colWidths 값을 수동 지정하지 않고 전체폭(515) 비례식 분할로 안전 계산
+    # 가로폭 자동 유실 문제를 막기 위한 비례 분할 가로 크기 연산 지정
     w_info = [515 / 6] * 6
-    w_ch = [365, 150]
-    w_diff = [100, 80, 335]
+    w_ch = [415, 100]
+    w_diff = [80, 150, 285]
     w_comment = [515]
     
     info_data = [
@@ -97,14 +98,14 @@ def create_academy_report(data):
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-        ('TOPPADDING', (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(t_info)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
     story.append(Paragraph("📈 단원별 평가 분석", section_style))
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 4))
     
     ch_rows = [[Paragraph('<b>평가 단원 영역</b>', body_center), Paragraph('<b>성취도 (%)</b>', body_center)]]
     for ch in data.get("chapters", []):
@@ -115,44 +116,63 @@ def create_academy_report(data):
         ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 7),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
     ]))
     story.append(t_ch)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
+    # [수정사항 1] 문항 진단 테이블 내부에 가로 막대 그래프 레이아웃 삽입
     story.append(Paragraph("📊 문항 난이도별 정답률 분석", section_style))
+    story.append(Spacer(1, 4))
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "하": "0"})
     
+    def make_bar_chart_cell(pct_str):
+        try:
+            pct = min(100, max(0, int(''.join(filter(str.isdigit, str(pct_str))))))
+        except:
+            pct = 0
+        w_bar = max(1, int(pct * 1.2)) # 그래프 비율 최적화
+        w_empty = 120 - w_bar
+        bar_table = Table([['', '']], colWidths=[w_bar, max(1, w_empty)])
+        bar_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#1E3A8A')), # 코넬 블루 바 채우기
+            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#F1F5F9')), # 배경 잔여 칸
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+        ]))
+        return bar_table
+
     diff_data = [
-        [Paragraph('<b>난이도</b>', body_center), Paragraph('<b>정답률</b>', body_center), Paragraph('<b>취약도 진단</b>', body_center)],
-        [Paragraph('최상 / 상', body_style), Paragraph(f"{st_diff.get('상', '0')}%", body_center), Paragraph('심화 개념 및 고난도 문제해결력 진단', body_style)],
-        [Paragraph('중', body_style), Paragraph(f"{st_diff.get('중', '0')}%", body_center), Paragraph('응용 문제 및 핵심 유형 적용력 진단', body_style)],
-        [Paragraph('하', body_style), Paragraph(f"{st_diff.get('하', '0')}%", body_center), Paragraph('기본 개념 및 기초 계산 능력 진단', body_style)]
+        [Paragraph('<b>난이도</b>', body_center), Paragraph('<b>정답률 그래프</b>', body_center), Paragraph('<b>취약도 진단</b>', body_center)],
+        [Paragraph('최상 / 상', body_style), make_bar_chart_cell(st_diff.get('상', '0')), Paragraph(f"정답률 {st_diff.get('상', '0')}% - 고난도 문제해결력 분석", body_style)],
+        [Paragraph('중', body_style), make_bar_chart_cell(st_diff.get('중', '0')), Paragraph(f"정답률 {st_diff.get('중', '0')}% - 응용 개념 적용력 분석", body_style)],
+        [Paragraph('하', body_style), make_bar_chart_cell(st_diff.get('하', '0')), Paragraph(f"정답률 {st_diff.get('하', '0')}% - 기본 기초 계산력 분석", body_style)]
     ]
     t_diff = Table(diff_data, colWidths=w_diff)
     t_diff.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (2,0), colors.HexColor('#E2E8F0')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 7),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+        ('ALIGN', (1,1), (1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(t_diff)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 15))
     
     story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 4))
     
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
     t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
-        ('TOPPADDING', (0,0), (0,0), 12),
-        ('BOTTOMPADDING', (0,0), (0,0), 12),
-        ('LEFTPADDING', (0,0), (0,0), 12),
-        ('RIGHTPADDING', (0,0), (0,0), 12),
+        ('TOPPADDING', (0,0), (0,0), 10),
+        ('BOTTOMPADDING', (0,0), (0,0), 10),
+        ('LEFTPADDING', (0,0), (0,0), 10),
+        ('RIGHTPADDING', (0,0), (0,0), 10),
     ]))
     story.append(t_comment)
     
@@ -161,7 +181,7 @@ def create_academy_report(data):
         logo_filename = "cornell.png"
         if os.path.exists(logo_filename):
             try:
-                canvas.drawImage(logo_filename, 237, 20, width=120, height=30, mask='auto')
+                canvas.drawImage(logo_filename, 237, 15, width=120, height=30, mask='auto')
             except:
                 pass
         canvas.restoreState()
@@ -220,8 +240,7 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                # [에러 해결 최종 조치] choices 리스트의 첫 번째 원소를 인덱스화([0])하여 속성을 완벽히 꺼내옴
-                ai_raw_data = response.choices[0].message.content
+                ai_raw_data = response.choices.message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 정밀 분석 완료!")
             except Exception as e:
