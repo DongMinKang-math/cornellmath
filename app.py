@@ -84,10 +84,8 @@ def create_academy_report(data):
     
     computed_level = calculate_math_level(data.get('score', '0'))
     
-    # [오류 완전 박멸] 유실되기 쉽던 가로 크기 숫자를 정상 복구하여 완벽하게 고정 선언 완료 (총합 515)
-    w_info = [85, 86, 85, 86, 86, 87]
-    w_ch = [386, 129]
-    w_diff = [100, 140, 275]
+    w_info = [515 / 6] * 6
+    w_ch = [515 * 0.75, 515 * 0.25]
     w_comment = [515]
     
     info_data = [
@@ -143,7 +141,7 @@ def create_academy_report(data):
     
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    x_coords = [45, 145, 255, 365, 465]
+    x_coords = [40, 143, 257, 371, 475]
     
     for i, lvl in enumerate(levels):
         try:
@@ -166,7 +164,7 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 12))
     
-    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (매쓰플랫 발췌)", section_style))
+    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (매쓰플랫 원문 발췌)", section_style))
     story.append(Spacer(1, 4))
     
     weak_list = data.get("weak_types", [])
@@ -174,7 +172,7 @@ def create_academy_report(data):
         weak_list = ["원본 보고서의 취약 유형 단원을 검토해 주세요."]
         
     for i, weak in enumerate(weak_list, 1):
-        story.append(Paragraph(f"• <b>{weak}</b> : 취약도가 발견된 대표적인 유형 영역입니다. 코넬만의 밀착 오답 메커니즘을 통한 오답 클리닉이 집중적으로 필요합니다.", body_style))
+        story.append(Paragraph(f"• <b>{weak}</b> : 매쓰플랫 진단지 상에 명시된 대표 취약 유형입니다. 코넬만의 밀착 오답 솔루션 관리가 필요합니다.", body_style))
     story.append(Spacer(1, 12))
     
     story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
@@ -192,7 +190,6 @@ def create_academy_report(data):
     ]))
     story.append(t_comment)
     
-    # [수정사항 2] 위아래로 너무 찌그러졌던 상하폭을 이전값(30)과 현재값(45)의 중간인 38pt로 정밀 밸런스 패치 완료
     def add_footer_logo(canvas, doc):
         canvas.saveState()
         logo_filename = "cornell.png"
@@ -218,7 +215,7 @@ if uploaded_file is not None:
             del st.session_state['input_cleared']
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI 진단 엔진이 매쓰플랫 구조 폰트를 역해석하고 데이터를 정밀 복원 중입니다..."):
+        with st.spinner("코넬 AI 진단 엔진이 4페이지 세부 진단 결과 영역을 정밀하게 복원하여 발췌 중입니다..."):
             try:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
@@ -230,27 +227,31 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 
-                # [수정사항 1] AI가 단원을 지어내지 않고, 깨진 글자 파편 분석을 통해 4페이지 주변의 순수 '대표 취약 유형' 텍스트를 복원/발췌하도록 시스템 프롬프트 대폭 강화
+                # [수정 사항] 대표 취약 유형을 마음대로 꾸미지 않고 4페이지 원본을 똑같이 흉내내어 발췌하도록 AI 지시문(프롬프트) 극대화 조정
                 system_prompt = """
-                너는 매쓰플랫 시스템 보고서의 파일 구조와 특수 한글 암호화 폰트 체계를 완벽하게 지식으로 갖고 있는 인코딩 복구 AI 전문가이자 코넬수학의 입학상담 실장이야.
+                너는 매쓰플랫 시스템 보고서의 파일 구조와 특수 암호화 폰트 체계를 해독하는 정밀 데이터 분석관이야.
+                너의 임무는 입력된 매쓰플랫 텍스트에서 학부모 전송용 JSON 데이터를 완벽하게 교정 및 추출해내는 것이야.
 
-                [현상 정보 및 조치 지침]:
-                1. 현재 입력으로 주어지는 텍스트 데이터는 매쓰플랫 내부 서체의 특수 암호화 배치 때문에 한글 자음/모음이 꼬이거나 외계어 형태로 깨져서 보일 수 있어.
-                2. 너는 글자 자체에 매몰되지 말고, 매쓰플랫 레벨테스트지의 고유 데이터 정렬 패턴(점수, 단원 레이아웃, 난이도 테이블 배치 구조)을 해독하여 정상적인 한국어 정보로 변환(역인코딩)해야 해.
-                3. 특히 [PAGE 4] 및 세부 영역에 표기된 '대표 취약 유형' 또는 '오답률이 높은 유형'의 깨진 단어 구조를 올바른 대한민국 교과과정 수학 단원명(예: 일차방정식의 활용, 삼각형의 성질 등)으로 복구하여 원문 발췌 가치와 동일하게 정제해줘. 절대 임의로 지어내지 말고, 그 4페이지 표 안에 매칭되어 나타나 있는 실제 오답 핵심 유형 명칭을 복원해야 해.
-                4. difficulty 수치 파싱: 난이도별 정답률은 임의 유추하지 말고, 배치 테이블에서 매칭된 값을 추출해줘.
-                5. teacher_comment 고도화: '코넬수학에 관심을 가지고 진단에 응해주어 감사하다'는 첫인사 후, 약점을 보완하여 성적을 끌어올릴 수 있는 정중하고 매끄러운 코멘트를 3중 자체 검증하여 작성해줘.
+                [대표 취약 유형 추출 절대 규칙]:
+                - '--- [PAGE 4] ---' 라벨 하위 영역 및 세부 분석란에 기재된 '대표 취약 유형' 혹은 '오답률이 높은 유형' 표기 텍스트를 최우선적으로 탐색해라.
+                - 추출 시, 네가 임의로 수학적 지식을 가미하여 개념명을 새로 정하거나 수정하는 것을 엄격히 금지한다. 
+                - 글자가 깨지거나 순서가 꼬여 있더라도, 그 문맥에 존재하는 매쓰플랫 내부의 실제 '대표 취약 유형명'(예: 연립방정식의 풀이, 이등변삼각형의 성질 등)을 찾아서 단어 하나 바꾸지 말고 원문 그대로 똑같이 발췌하여 weak_types 배열에 담아라.
+
+                [나머지 항목 정제 가이드라인]:
+                1. report_month: 원본 문서 안의 날짜를 추적하여 반드시 'YYYY/MM/DD' 형태의 시험 일자로 고정 포맷팅할 것.
+                2. difficulty: 난이도 테이블(최상, 상, 중, 중하, 하) 내부의 정답률 숫자를 매칭하여 가져올 것.
+                3. teacher_comment: "코넬수학에 관심을 가지고 진단에 응해주어 감사하다"는 정중한 감사 멘트로 친절히 시작하고, 단원별 상태 진단 점검 분석과 밀착 클리닉 솔루션을 3중 크로스체크하여 매끄러운 원장님 서체 문장(4~5문장)으로 구성할 것.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
-                    "student_name": "복구된 학생 이름",
+                    "student_name": "교정된 학생 이름",
                     "school_name": "학교명",
                     "student_grade": "학년",
                     "report_month": "YYYY/MM/DD 형식의 시험 일자",
                     "score": "종합 점수 (숫자만)",
                     "chapters": [
-                        {"name": "올바르게 교정된 단원명 1", "achievement": "성취도 숫자"},
-                        {"name": "올바르게 교정된 단원명 2", "achievement": "성취도 숫자"}
+                        {"name": "교정된 단원명 1", "achievement": "성취도 숫자"},
+                        {"name": "교정된 단원명 2", "achievement": "성취도 숫자"}
                     ],
                     "difficulty": {
                         "최상": "최상 정답률 숫자",
@@ -259,11 +260,10 @@ if uploaded_file is not None:
                         "중하": "중하 정답률 숫자",
                         "하": "하 정답률 숫자"
                     },
-                    "weak_types": ["PAGE 4 구조에서 완벽히 복원 발췌한 대표 취약 유형 1", "유형 2", "유형 3"],
+                    "weak_types": ["4페이지에서 원문 글자 그대로 똑같이 복원 발췌한 대표 취약 유형 1", "유형 2", "유형 3"],
                     "teacher_comment": "매끄럽게 보완된 상담 코멘트"
                 }
                 """
-                # [문법 교정] 최신 openai 패키지 인터페이스 명세서 동기화 (choices[0] 명시)
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": full_text}],
@@ -272,7 +272,7 @@ if uploaded_file is not None:
                 
                 ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 데이터 인코딩 보정 및 발췌 완료!")
+                st.success("🎉 코넬 데이터 인코딩 보정 및 원문 발췌 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
