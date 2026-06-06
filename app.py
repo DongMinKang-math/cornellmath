@@ -79,7 +79,8 @@ def create_academy_report(data):
     ]))
     story.append(t_banner)
     story.append(Spacer(1, 6))
-    story.append(Paragraph(f"<b>진단일자:</b> {data.get('report_month', '최근')}", info_style))
+    # [수정사항 1] '진단일자' 대신 '시험 일자' 명칭 변경 반영
+    story.append(Paragraph(f"<b>시험 일자:</b> {data.get('report_month', '년/월/일')}", info_style))
     story.append(Spacer(1, 4))
     
     computed_level = calculate_math_level(data.get('score', '0'))
@@ -132,7 +133,7 @@ def create_academy_report(data):
     story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
     story.append(Spacer(1, 4))
     
-    # [수정사항 2] 정밀 필터링된 5단계 수치를 차트에 바인딩
+    # 원장님이 화면에서 직접 수정한 난이도별 정답률 적용
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     
     drawing = Drawing(515, 100)
@@ -144,7 +145,7 @@ def create_academy_report(data):
     
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    x_coords = [45, 150, 257, 365, 470]
+    x_coords = [45, 147, 257, 367, 470]
     
     for i, lvl in enumerate(levels):
         try:
@@ -167,16 +168,16 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 12))
     
-    # [수정사항 1] 동적으로 추출된 대표 취약 유형을 성적표 본문에 매핑
-    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (4Page 기반 분석)", section_style))
+    # [수정사항 4] 발췌된 실제 대표 취약 유형 출력
+    story.append(Paragraph("🚨 집중 보완 필요 대표 취약 유형 (매쓰플랫 발췌)", section_style))
     story.append(Spacer(1, 4))
     
     weak_list = data.get("weak_types", [])
-    if not weak_list:
-        weak_list = ["종합 단원 연산 세부 개념", "응용 심화 문제 해결력", "문장제 문제 식 세우기 메커니즘"]
+    if not weak_list or len(weak_list) == 0:
+        weak_list = ["원본 보고서의 취약 유형 단원을 검토해 주세요."]
         
     for i, weak in enumerate(weak_list, 1):
-        story.append(Paragraph(f"• <b>{weak}</b> : 해당 개념유형의 오답 분석 및 코넬 맞춤형 오답 클리닉 학습이 집중적으로 필요합니다.", body_style))
+        story.append(Paragraph(f"• <b>{weak}</b> : 취약도가 발견된 대표적인 유형 영역입니다. 코넬만의 밀착 오답 메커니즘을 통한 오답 클리닉이 집중적으로 필요합니다.", body_style))
     story.append(Spacer(1, 12))
     
     story.append(Paragraph("🦅 코넬 분석 Comment", section_style))
@@ -194,12 +195,13 @@ def create_academy_report(data):
     ]))
     story.append(t_comment)
     
+    # [수정사항 5] 황금 비율로 상하 밸런스 조정 완료 (가로 110, 세로 38)
     def add_footer_logo(canvas, doc):
         canvas.saveState()
         logo_filename = "cornell.png"
         if os.path.exists(logo_filename):
             try:
-                canvas.drawImage(logo_filename, 247, 10, width=100, height=45, mask='auto')
+                canvas.drawImage(logo_filename, 242, 12, width=110, height=38, mask='auto')
             except:
                 pass
         canvas.restoreState()
@@ -219,12 +221,11 @@ if uploaded_file is not None:
             del st.session_state['input_cleared']
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI 엔진이 4페이지 세부 진단 결과 및 난이도별 정답률을 교정 분석 중입니다..."):
+        with st.spinner("코넬 AI 진단 엔진이 4페이지 대표 취약 유형 및 핵심 수치를 삼중 검증 파싱 중입니다..."):
             try:
                 reader = PdfReader(uploaded_file)
                 full_text = ""
                 
-                # AI 분석 최적화를 위해 페이지 번호를 트래킹하며 텍스트 결합
                 for idx, page in enumerate(reader.pages, 1):
                     text = page.extract_text()
                     if text:
@@ -232,36 +233,37 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
                 
-                # [수정사항 1, 2] 수치 오차 및 4페이지 취약 유형 타겟 추출을 강제하는 정밀 프롬프트 가이드라인 설정
+                # [수정사항 1, 3, 4] 시험일자 날짜 포맷 강제 및 3중 윤문 지침, 4페이지 취약 유형 직접 발췌 강제화
                 system_prompt = """
-                너는 코넬수학전문학원의 수석 입학진단 실장이야.
-                매쓰플랫 결과 텍스트를 분석하여 신규 등록용 진단 보고서 데이터 JSON을 완벽하게 빌드해줘.
+                너는 코넬수학전문학원의 수석 교육 분석관이야.
+                매쓰플랫 결과 텍스트를 바탕으로 학부모 상담용 보고서에 활용할 정밀 진단 JSON 데이터를 구성해줘.
 
-                [추출 필수 준수 조건]:
-                1. weak_types 추출: 텍스트 내에서 '--- [PAGE 4] ---' 라벨 주변 또는 단원별 취약 유형 분석란을 집중 점검하여, 오답률이 가장 높은 대표적인 세부 수학 유형 이름 3가지를 한국어로 명확히 골라내어 배열에 담아줘.
-                2. difficulty 수치 추출: 각 난이도(최상, 상, 중, 중하, 하)별 정답률은 다른 점수와 혼동하지 마라. 표 안의 난이도 옆에 매칭된 순수한 퍼센트(%) 숫자만 추출해야 해. 만약 특정 난이도가 문제에 출제되지 않아 공란이거나 찾을 수 없다면 유추하지 말고 반드시 "0"으로 반환해라.
-                3. teacher_comment: 학부모님이 신뢰를 가질 수 있도록 친절하고 깊이 있는 문장으로 4~5문장 작성해줘.
+                [데이터 정제 필수 조건]:
+                1. report_month 추출: 원본 PDF 문서의 초기 날짜 영역을 찾아 반드시 '년/월/일' 형식(예: 2026/06/06)의 시험 일자로 포맷팅하여 응답해줘.
+                2. weak_types 발췌: 텍스트 상에서 '대표 취약 유형' 혹은 '오답률 높은 유형' 표기 영역(특히 PAGE 4 단원 분석 부분)을 샅샅이 뒤져서 그곳에 나오는 핵심 단원/유형 이름을 글자 그대로 100% 원문 발췌하여 리스트로 넣어줘. (너가 지어내지 마라)
+                3. difficulty 수치 파싱: 각 난이도(최상, 상, 중, 중하, 하)와 나란히 배치된 실제 오답률/정답률 표 안의 숫자를 분석하여 매칭해줘.
+                4. teacher_comment 고도화: '코넬수학에 관심을 가지고 진단에 응해주어 감사하다'는 인사를 첫 줄에 넣을 것. 학생이 틀린 대단원 약점을 짚은 후 '코넬수학만의 차별화된 시스템과 밀착 오답 클리닉을 통해 어떻게 성적을 상위권 레벨로 확실하게 끌어올릴 것인지' 확신을 주는 학원 원장 어조의 코멘트를 작성해줘. 작성 후 문장이 매끄러운지 스스로 3중 크로스체크하여 가독성이 뛰어난 완성형 문장(4~5문장)으로 전달해줘.
 
                 [반드시 지켜야 할 응답 JSON 형식]:
                 {
                     "student_name": "학생 이름",
                     "school_name": "학교명",
                     "student_grade": "학년",
-                    "report_month": "오늘 날짜 또는 진단 회차",
+                    "report_month": "YYYY/MM/DD 형식의 시험 일자",
                     "score": "종합 성취 점수(숫자만)",
                     "chapters": [
                         {"name": "분석 단원명 1", "achievement": "성취도 숫자"},
                         {"name": "분석 단원명 2", "achievement": "성취도 숫자"}
                     ],
                     "difficulty": {
-                        "최상": "최상 정답률 숫자만",
-                        "상": "상 정답률 숫자만",
-                        "중": "중 정답률 숫자만",
-                        "중하": "중하 정답률 숫자만",
-                        "하": "하 정답률 숫자만"
+                        "최상": "최상 정답률 숫자",
+                        "상": "상 정답률 숫자",
+                        "중": "중 정답률 숫자",
+                        "중하": "중하 정답률 숫자",
+                        "하": "하 정답률 숫자"
                     },
-                    "weak_types": ["4페이지 기반 대표 취약 유형 1", "유형 2", "유형 3"],
-                    "teacher_comment": "정중한 입학 상담 코멘트 문구"
+                    "weak_types": ["텍스트 원문에서 그대로 가져온 대표 취약 유형 1", "유형 2", "유형 3"],
+                    "teacher_comment": "매끄럽게 삼중 보완된 정중한 원장님용 상담 코멘트 문구"
                 }
                 """
                 response = client.chat.completions.create(
@@ -272,7 +274,7 @@ if uploaded_file is not None:
                 
                 ai_raw_data = response.choices.message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 4페이지 크로스체크 및 데이터 보정 완료!")
+                st.success("🎉 코넬 데이터 정밀 교정 및 발췌 완료!")
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
 
@@ -290,18 +292,42 @@ if uploaded_file is not None:
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            student_name = st.text_input("학생 이름 (필수 입력)", value=res.get("student_name", ""))
+            student_name = st.text_input("학생 이름 (필수)", value=res.get("student_name", ""))
         with col2:
             school_name = st.text_input("학교명 입력", value=res.get("school_name", ""))
         with col3:
             student_grade = st.text_input("학년 입력", value=res.get("student_grade", ""))
             
+        report_month = st.text_input("시험 일자 (년/월/일)", value=res.get("report_month", ""))
         score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
+        
+        # [수정사항 2] 종합 점수 아래에 난이도별 정답률을 직접 수정할 수 있도록 입력 컴포넌트 추가
+        st.markdown("#### 📊 난이도별 정답률 수정 검토 (오차 발생 시 여기서 직접 수정하세요)")
+        diff_obj = res.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
+        
+        d_col1, d_col2, d_col3, d_col4, d_col5 = st.columns(5)
+        with d_col1:
+            d_ha = st.text_input("하 (%)", value=str(diff_obj.get("하", "0")))
+        with d_col2:
+            d_mid_ha = st.text_input("중하 (%)", value=str(diff_obj.get("중하", "0")))
+        with d_col3:
+            d_mid = st.text_input("중 (%)", value=str(diff_obj.get("중", "0")))
+        with d_col4:
+            d_sang = st.text_input("상 (%)", value=str(diff_obj.get("상", "0")))
+        with d_col5:
+            d_choi = st.text_input("최상 (%)", value=str(diff_obj.get("최상", "0")))
+            
+        # 수정된 난이도 데이터를 구조체에 동기화
+        res["difficulty"] = {
+            "하": d_ha, "중하": d_mid_ha, "중": d_mid, "상": d_sang, "최상": d_choi
+        }
+        
         teacher_comment = st.text_area("🦅 코넬 분석 Comment (상담 방향에 맞게 편집 가능)", value=res.get("teacher_comment", ""), height=150)
         
         res["student_name"] = student_name
         res["school_name"] = school_name
         res["student_grade"] = student_grade
+        res["report_month"] = report_month
         res["score"] = score
         res["teacher_comment"] = teacher_comment
         
