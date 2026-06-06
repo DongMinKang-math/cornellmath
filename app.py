@@ -33,14 +33,13 @@ def create_academy_report(data):
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     story = []
     
-    # [핵심 수정] 깃허브에 업로드한 실제 TTF 폰트 파일 연동 (한글 증발 현상 차단)
-    font_filename = "NANUMGOTHIC.TTF"  # 원장님이 깃허브에 올린 한글 폰트 파일명과 일치해야 합니다.
+    # 깃허브에 업로드한 폰트 파일 연동 설정
+    font_filename = "NANUMGOTHIC.TTF"
     
     if os.path.exists(font_filename):
         pdfmetrics.registerFont(TTFont('CustomFont', font_filename))
         font_name = 'CustomFont'
     else:
-        # 폰트 파일이 없을 때 기본 시스템 폰트로 임시 대체 경고문구
         st.warning(f"⚠️ 저장소에 {font_filename} 파일이 없어 한글이 공백으로 나올 수 있습니다. 폰트를 업로드해 주세요.")
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
@@ -48,13 +47,12 @@ def create_academy_report(data):
         
     styles = getSampleStyleSheet()
     
-    # 폰트 스타일 정의 (줄간격 leading 세부 조정으로 글자 겹침 방지)
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=24, leading=28, alignment=1, textColor=colors.HexColor('#1E3A8A'))
     info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=11, leading=14, alignment=2)
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=11, leading=16)
     section_style = ParagraphStyle('SectionStyle', parent=styles['Heading2'], fontName=font_name, fontSize=14, leading=18, textColor=colors.HexColor('#1E3A8A'))
     
-    # 1. 상단 학원 로고 배치 (파일이 존재할 때만 출력)
+    # 상단 학원 로고 배치
     logo_filename = "cornell.png"
     if os.path.exists(logo_filename):
         try:
@@ -63,19 +61,18 @@ def create_academy_report(data):
         except:
             pass
             
-    # 2. 타이틀 및 디자인 선
     story.append(Paragraph("수 학 학 원  정 기  성 적 표", title_style))
     story.append(Spacer(1, 15))
     story.append(Paragraph(f"<b>분석 기준일:</b> {data.get('report_month', '이번 달')}", info_style))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#1E3A8A'), spaceBefore=5, spaceAfter=20))
     
-    # 3. 학생 기본 정보 표 (너비 고정하여 글자 잘림 방지)
+    # [수정완료] 학생 기본 정보 표 가로 너비 (총 510)
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_style), Paragraph(data.get('student_name', ''), body_style),
          Paragraph('<b>종합 점수</b>', body_style), Paragraph(f"{data.get('score', '')}점", body_style),
          Paragraph('<b>반 평 균</b>', body_style), Paragraph(f"{data.get('average_score', '')}점", body_style)]
     ]
-    t_info = Table(info_data, colWidths=[80, 90, 80, 90, 80, 100])
+    t_info = Table(info_data, colWidths=[80, 90, 80, 90, 80, 90])
     t_info.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F1F5F9')),
         ('BACKGROUND', (2,0), (2,0), colors.HexColor('#F1F5F9')),
@@ -89,7 +86,6 @@ def create_academy_report(data):
     story.append(t_info)
     story.append(Spacer(1, 25))
     
-    # 4. 단원별 세부 성취도 표
     story.append(Paragraph("📈 단원별 세부 성취도", section_style))
     story.append(Spacer(1, 8))
     
@@ -97,6 +93,7 @@ def create_academy_report(data):
     for ch in data.get("chapters", []):
         ch_rows.append([Paragraph(ch['name'], body_style), Paragraph(f"{ch['achievement']}%", body_style)])
         
+    # [수정완료] 단원 성취도 표 가로 너비 (총 510)
     t_ch = Table(ch_rows, colWidths=[380, 130])
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (1,0), colors.HexColor('#E2E8F0')),
@@ -109,7 +106,6 @@ def create_academy_report(data):
     story.append(t_ch)
     story.append(Spacer(1, 25))
     
-    # 5. 취약 유형 분석 항목
     story.append(Paragraph("🚨 집중 보완이 필요한 취약 유형", section_style))
     story.append(Spacer(1, 8))
     for i, weak in enumerate(data.get("weak_types", []), 1):
@@ -117,15 +113,15 @@ def create_academy_report(data):
         story.append(Spacer(1, 6))
     story.append(Spacer(1, 25))
     
-    # 6. 원장님 종합 의견 코멘트 박스
     story.append(Paragraph("📝 학원 지도 및 종합 의견", section_style))
     story.append(Spacer(1, 8))
     
+    # [수정완료] 코멘트 박스 가로 너비 (총 510)
     comment_box = [[Paragraph(data.get('teacher_comment', '내용 없음').replace('\n', '<br/>'), body_style)]]
     t_comment = Table(comment_box, colWidths=[510])
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
-        ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')), # 학원 메인 테두리 색상 적용
+        ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
         ('TOPPADDING', (0,0), (0,0), 12),
         ('BOTTOMPADDING', (0,0), (0,0), 12),
         ('LEFTPADDING', (0,0), (0,0), 12),
@@ -133,7 +129,6 @@ def create_academy_report(data):
     ]))
     story.append(t_comment)
     
-    # 하단 안내장 푸터
     story.append(Spacer(1, 35))
     story.append(Paragraph("<b>수학전문학원 원장 드림</b>", ParagraphStyle('Footer', parent=body_style, alignment=1, fontSize=13)))
     
@@ -182,7 +177,8 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_content = response.choices.message.content
+                # [수정완료] 리스트 객체의 첫 번째 인덱스[0] 명시
+                ai_content = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_content)
                 st.success("AI 데이터 분석 완료!")
             except Exception as e:
