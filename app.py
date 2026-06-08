@@ -47,8 +47,8 @@ def create_academy_report(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=40)
     story = []
-    
-    font_filename = "NANUMGOTHIC.TTF" 
+
+    font_filename = "NANUMGOTHIC.TTF"
     if os.path.exists(font_filename):
         pdfmetrics.registerFont(TTFont('CustomFont', font_filename))
         font_name = 'CustomFont'
@@ -57,17 +57,15 @@ def create_academy_report(data):
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
         font_name = 'HeiseiMin-W3'
-        
+
     styles = getSampleStyleSheet()
-    
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=18, leading=22, alignment=1, textColor=colors.HexColor('#FFFFFF'))
     info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=12, alignment=2, textColor=colors.HexColor('#64748B'))
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, textColor=colors.HexColor('#1E293B'))
     body_center = ParagraphStyle('BodyCenter', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, alignment=1, textColor=colors.HexColor('#1E293B'))
     section_style = ParagraphStyle('SectionStyle', parent=styles['Heading2'], fontName=font_name, fontSize=12, leading=16, textColor=colors.HexColor('#1E3A8A'))
-    
+
     story.append(Spacer(1, 5))
-    
     title_banner_data = [[Paragraph("<b>코넬수학전문학원 신규생 진단평가 결과 분석지</b>", title_style)]]
     t_banner = Table(title_banner_data, colWidths=515)
     t_banner.setStyle(TableStyle([
@@ -82,12 +80,11 @@ def create_academy_report(data):
     story.append(Spacer(1, 6))
     story.append(Paragraph(f"<b>시험 일자:</b> {data.get('report_month', '년/월/일')}", info_style))
     story.append(Spacer(1, 4))
-    
-    # 컴파일 오류를 유실을 원천 차단하기 위해 대괄호 고정값을 수식형 비율로 선언 (A4 내부 가로폭 515 완벽 매핑)
+
     w_info = [515 / 6] * 6
     w_ch = [515 * 0.42, 515 * 0.45, 515 * 0.13]
     w_comment = 515
-    
+
     info_data = [
         [Paragraph('<b>학 생 명</b>', body_center), Paragraph(data.get('student_name', ''), body_style),
          Paragraph('<b>학 교 명</b>', body_center), Paragraph(data.get('school_name', ''), body_style),
@@ -96,7 +93,6 @@ def create_academy_report(data):
          Paragraph('<b>진단 레벨</b>', body_center), Paragraph(f"<b>{calculate_math_level(data.get('score', '0'))} Level</b>", body_style),
          Paragraph('', body_style), Paragraph('', body_style)]
     ]
-    
     t_info = Table(info_data, colWidths=w_info)
     t_info.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,1), colors.HexColor('#F8FAFC')),
@@ -110,11 +106,10 @@ def create_academy_report(data):
     ]))
     story.append(t_info)
     story.append(Spacer(1, 12))
-    
+
     story.append(Paragraph("📈 단원별 성취 분석", section_style))
     story.append(Spacer(1, 4))
-    
-    # [디자인 완성] 1.5pt 극초슬림 실선 바 레이아웃 및 3색 그라데이션 선형 매핑 적용
+
     def make_ch_bar_cell(pct_val):
         try:
             pct = min(100, max(0, int(pct_val)))
@@ -122,12 +117,9 @@ def create_academy_report(data):
             pct = 0
         w_total_filled = max(1, int(pct * 2.0))
         w_empty = max(1, 200 - w_total_filled)
-        
         seg1 = min(w_total_filled, 70)
         seg2 = min(max(0, w_total_filled - 70), 70)
         seg3 = max(0, w_total_filled - 140)
-        
-        # 글자 수 유실 방지 가변 연산 패치
         bar_widths = [max(0.1, seg1), max(0.1, seg2), max(0.1, seg3), w_empty]
         bar_table = Table([['', '', '', '']], colWidths=bar_widths)
         bar_table.setStyle(TableStyle([
@@ -144,11 +136,10 @@ def create_academy_report(data):
     for ch in data.get("chapters", []):
         ach_clean = ''.join(filter(str.isdigit, str(ch['achievement'])))
         ch_rows.append([
-            Paragraph(ch['name'], body_style), 
-            make_ch_bar_cell(ach_clean), 
+            Paragraph(ch['name'], body_style),
+            make_ch_bar_cell(ach_clean),
             Paragraph(f"{ch['achievement']}%", body_center)
         ])
-        
     t_ch = Table(ch_rows, colWidths=w_ch)
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8FAFC')),
@@ -160,22 +151,21 @@ def create_academy_report(data):
     ]))
     story.append(t_ch)
     story.append(Spacer(1, 12))
-    
+
     story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
-    st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     
+    # [오류 해결] 0% 매핑 에러 방지를 위해 확장된 difficulty_analysis 키 연동
+    st_diff = data.get("difficulty_analysis", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     drawing = Drawing(515, 100)
     drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
-    
-    # [수정완료] 잘려나가기 쉽던 대괄호 묶음 대신 수식 루프로 Y 가이드라인 배정 처리
+
     for i in range(1, 5):
         y_pos = int((i * 25) * 0.8) + 10
         drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5, strokeDashArray=[2, 2]))
-    
+
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
     
-    # [수정완료] 잘려나가기 쉽던 X축 좌표 대괄호를 수식형 연산 루프로 복구 완료 (5등분)
     for i in range(5):
         lvl = levels[i]
         try:
@@ -186,7 +176,7 @@ def create_academy_report(data):
         x_pos = int(40 + (i * 108))
         y_pos = int(val * 0.8) + 10
         points.append((x_pos, y_pos, val))
-        
+
     for i in range(len(points)):
         x, y, v = points[i]
         drawing.add(String(x, 2, levels[i], fontName='CustomFont', fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#475569')))
@@ -195,77 +185,18 @@ def create_academy_report(data):
         if i > 0:
             px, py, _ = points[i-1]
             drawing.add(Line(px, py, x, y, strokeColor=colors.HexColor('#1E3A8A'), strokeWidth=1.2))
-            
     story.append(drawing)
     story.append(Spacer(1, 15))
-    
+
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
-    
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
     t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
         ('TOPPADDING', (0,0), (0,0), 8),
-        ('BOTTOMPADDING', (0,0), (0,0), 8),
-        ('LEFTPADDING', (0,0), (0,0), 10),
-        ('RIGHTPADDING', (0,0), (0,0), 10),
-    ]))
-   story.append(t_comment) # <--- 기존 코드 위치 찾기
-
-    # --------------------------------------------------------------------
-    # [4단계] 대표 우수/취약 유형 (각 최대 3가지) 좌우 2분할 배치 레이아웃
-    # --------------------------------------------------------------------
-    story.append(Spacer(1, 15))
-
-    # 좌측 컬럼: 대표 우수 유형 3가지
-    mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
-    mastery_list = data.get("mastery_types", [])
-    if not mastery_list:
-        mastery_content.append(Paragraph("• 성취도 분석에 따라 전반적으로 안정적입니다.", body_style))
-    else:
-        for m_type in mastery_list[:3]:  
-            mastery_content.append(Paragraph(f"• {m_type}", body_style))
-            mastery_content.append(Spacer(1, 4))
-
-    # 우측 컬럼: 대표 취약 유형 3가지 (C53030 레드 컬러 강조)
-    section_style_red = ParagraphStyle('SectionRed', parent=section_style, textColor=colors.HexColor("#C53030"))
-    weakness_content = [Paragraph("<b>■ 대표 취약 유형</b>", section_style_red), Spacer(1, 6)]
-    weakness_list = data.get("weakness_types", [])
-    if not weakness_list:
-        weakness_content.append(Paragraph("• 특이 취약 유형이 검출되지 않았습니다.", body_style))
-    else:
-        for w_type in weakness_list[:3]:  
-            weakness_content.append(Paragraph(f"• {w_type}", body_style))
-            weakness_content.append(Spacer(1, 4))
-
-    # 표(Table) 구성을 통해 한 줄에 좌우로 정렬하여 배치
-    type_data = [[mastery_content, weakness_content]]
-    type_table = Table(type_data, colWidths=[w_comment / 2 - 10, w_comment / 2 - 10])
-    type_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    story.append(type_table)
-    # ====================================================================
-    
-    def add_footer_logo(canvas, doc):
-        canvas.saveState()
-        logo_filename = "cornell.png"
-        if os.path.exists(logo_filename):
-            try:
-                canvas.drawImage(logo_filename, 242, 10, width=110, height=42, mask='auto')
-            except:
-                pass
-        canvas.restoreState()
-        
-    doc.build(story, onFirstPage=add_footer_logo, onLaterPages=add_footer_logo)
-    buffer.seek(0)
-    return buffer
+        ('BOTTOMPADDING', (0,0),
 # ====================================================================
 # [교정 완료] 라인 208번 이후의 파일 업로드 및 AI 호출 전체 로직
 # ====================================================================
