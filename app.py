@@ -350,22 +350,34 @@ if uploaded_file is not None:
         "teacher_comment": teacher_comment
     }
 
-    st.markdown("---")
+st.markdown("---")
     
-    # 좌우 2분할 레이아웃 배치 (왼쪽: 다운로드 및 정보 / 오른쪽: 실시간 인앱 PDF 미리보기)
+    # [교정 완료] 변수 범위(Scope) 분리 오류 해결: PDF 바이너리를 먼저 생성한 후 레이아웃에 뿌립니다.
+    pdf_bin = create_academy_report(final_data)
+
+    # 좌우 2분할 레이아웃 배치 (왼쪽: 다운로드 안내 및 버튼 / 오른쪽: 실시간 인앱 PDF 미리보기)
     left_col, right_col = st.columns([1, 1.2])
     
-with right_col:
+    with left_col:
+        st.markdown("### 🖨️ 3단계: 성적표 결과지 발행")
+        st.success("🎉 분석지 생성이 완료되었습니다. 아래 버튼을 눌러 소장하세요!")
+        st.download_button(
+            label="💾 코넬수학 진단평가 결과지 PDF 다운로드",
+            data=pdf_bin,
+            file_name=f"코넬수학_진단결과분석지_{s_name}.pdf",
+            mime="application/pdf",
+            type="primary"
+        )
+        
+    with right_col:
         st.markdown("### 🔍 발급 예정 결과지 미리보기")
         try:
-            # 기존의 불안정한 iframe 방식을 제거하고 공식 pdf_viewer 모듈을 호출합니다.
+            # 공식 pdf_viewer 모듈을 호출하여 깨짐 없이 즉시 렌더링합니다.
             from streamlit_pdf_viewer import pdf_viewer
-            
-            # 바이너리 스트림 데이터를 그대로 넘겨주어 인앱으로 깔끔하게 렌더링합니다.
             pdf_viewer(input=pdf_bin.getvalue(), width=700, height=800)
             
         except Exception as display_err:
-            # 만약 라이브러리 로딩에 지연이 생길 경우를 대비한 안전 백업 대안책
+            # 만약 라이브러리 로딩에 실패할 경우를 대비한 백업 대안책 (iframe)
             import base64
             base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
             pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="700px" type="application/pdf"></iframe>'
