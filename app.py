@@ -213,6 +213,33 @@ def create_academy_report(data):
         ('RIGHTPADDING', (0,0), (0,0), 10),
     ]))
     story.append(t_comment)
+    # ====================================================================
+    # [4단계 신설] 매쓰플랫 4페이지 기반 대표 우수/취약 유형 PDF 드로잉 로직
+    # ====================================================================
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("<b>■ 코넬수학 선정 대표 우수 유형</b>", section_style))
+    story.append(Spacer(1, 6))
+    
+    mastery_list = data.get("mastery_types", [])
+    if not mastery_list:
+        story.append(Paragraph("• 해당 사항 없음 (단원별 성취도 안정적)", body_style))
+    else:
+        for m_type in mastery_list:
+            story.append(Paragraph(f"• {m_type}", body_style))
+            story.append(Spacer(1, 4))
+
+    story.append(Spacer(1, 15))
+    story.append(Paragraph("<b>■ 우선 보완 대표 취약 유형</b>", section_style))
+    story.append(Spacer(1, 6))
+    
+    weakness_list = data.get("weakness_types", [])
+    if not weakness_list:
+        story.append(Paragraph("• 해당 사항 없음 (특이 취약 유형 미검출)", body_style))
+    else:
+        for w_type in weakness_list:
+            story.append(Paragraph(f"• {w_type}", body_style))
+            story.append(Spacer(1, 4))
+    # ====================================================================
     
     def add_footer_logo(canvas, doc):
         canvas.saveState()
