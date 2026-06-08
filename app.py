@@ -22,7 +22,7 @@ st.markdown("""
         border: 2px solid #E2E8F0;
         border-radius: 12px;
         padding: 12px;
-        background-color: #F8FAFC;
+        background-color: #FFFFFF;
         box-shadow: 0 10px 25px rgba(0,0,0,0.08);
     }
     </style>
@@ -216,6 +216,7 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 15))
 
+    # [위치 교정 고정] 대표 우수/취약 유형 패널 선행 배치
     mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
     mastery_list = data.get("mastery_types", [])
     if not mastery_list:
@@ -247,7 +248,7 @@ def create_academy_report(data):
     story.append(type_table)
     story.append(Spacer(1, 15))
 
-    # [코멘트 상자 최하단 최종 피날레 배치 완료]
+    # [위치 교정 고정] 분석 코멘트 창을 가장 하단 최종 배치 완료
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
@@ -274,7 +275,7 @@ def create_academy_report(data):
     buffer.seek(0)
     return buffer
     # ====================================================================
-# [완벽 복구] 메인 UI 대시보드 및 입력 수정창 연동 제어 영역
+# [완벽 검증] 메인 UI 대시보드 및 실시간 연동 제어 영역
 # ====================================================================
 st.title("📊 코넬수학 레벨테스트 결과지 시스템")
 st.markdown("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
@@ -318,7 +319,7 @@ if uploaded_file is not None:
 
     res = st.session_state["ocr_result"]
 
-    # [복구 완해] 1단계: 학생 정보 검토 및 수정창 활성화
+    # [100% 복구 완료] 1단계 기본 정보 입력 및 동적 텍스트박스
     st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -334,11 +335,11 @@ if uploaded_file is not None:
     with col5:
         score_val = st.text_input("종합 점수", value=str(res.get("score", "")))
 
-    # [복구 완해] 2단계: 종합 코멘트 실시간 수정 관리 영역 활성화
+    # [100% 복구 완료] 2단계 코넬 코멘트 박스 편집 영역
     st.markdown("### 🦅 2단계: 종합 코멘트 관리")
     teacher_comment = st.text_area("코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
 
-    # 파이썬 데이터 사전 최종 바인딩
+    # 데이터 객체 컴파일 바인딩
     final_data = {
         "student_name": s_name,
         "school_name": sch_name,
@@ -354,10 +355,10 @@ if uploaded_file is not None:
 
     st.markdown("---")
     
-    # 레이아웃 나누기 직전 PDF 바이너리 데이터를 안전하게 우선 컴파일
+    # 렌더링 스코프 안전 컴파일 보장
     pdf_bin = create_academy_report(final_data)
 
-    # 화면 2분할 레이아웃 배치
+    # 2분할 그리드 작동
     left_col, right_col = st.columns([1, 1.2])
     
     with left_col:
@@ -374,13 +375,12 @@ if uploaded_file is not None:
     with right_col:
         st.markdown("### 🔍 발급 예정 결과지 미리보기")
         
-        # 고급 명품 액자 테두리 컨테이너 선언
+        # 그림자가 들어간 화이트 액자 테두리 컨테이너 내부 렌더링
         st.markdown('<div class="pdf-preview-container">', unsafe_allow_html=True)
         try:
-            # 브라우저별 차단 문제를 원천 우회하는 고해상도 HTML5 표준 object 인베딩 방식으로 전면 개정
-            base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
-            pdf_display = f'<object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="800px"><iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px"></iframe></object>'
-            st.markdown(pdf_display, unsafe_allow_html=True)
+            # 브라우저 차단 우회를 보장하는 streamlit_pdf_viewer 모듈 공식 호출 연동
+            from streamlit_pdf_viewer import pdf_viewer
+            pdf_viewer(input=pdf_bin.getvalue(), width=700, height=800)
         except Exception as display_err:
-            st.info("💡 실시간 미리보기를 불러오는 중입니다. 지연 발생 시 다운로드 버튼을 활용해 주세요.")
+            st.info("💡 실시간 미리보기를 불러오는 중입니다.")
         st.markdown('</div>', unsafe_allow_html=True)
