@@ -202,17 +202,25 @@ if uploaded_file is not None:
         "weakness_types": res.get("weakness_types", [])[:3],
         "teacher_comment": teacher_comment
     }
-
-    st.markdown("---")
+st.markdown("---")
+    
+    # PDF 파일 생성
     pdf_bin = create_academy_report(final_data)
 
-    left_col, right_col = st.columns([1, 1.2])
+    # 레이아웃 정의 (오류 방지를 위해 if문 바로 아래에 배치)
+    col_left, col_right = st.columns([1, 1.2])
     
-    with left_col:
+    with col_left:
         st.markdown("### 🖨️ 3단계: 성적표 결과지 발행")
-        st.download_button("💾 PDF 다운로드", data=pdf_bin, file_name=f"코넬수학_{s_name}.pdf", mime="application/pdf", type="primary")
+        st.download_button(
+            label="💾 PDF 다운로드", 
+            data=pdf_bin, 
+            file_name=f"코넬수학_{s_name}.pdf", 
+            mime="application/pdf", 
+            type="primary"
+        )
         
-    with right_col:
+    with col_right:
         st.markdown("### 🔍 결과지 미리보기")
         st.markdown('<div class="pdf-preview-container">', unsafe_allow_html=True)
         import base64
