@@ -153,8 +153,6 @@ def create_academy_report(data):
     story.append(Spacer(1, 12))
 
     story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
-    
-    # [오류 해결] 0% 매핑 에러 방지를 위해 확장된 difficulty_analysis 키 연동
     st_diff = data.get("difficulty_analysis", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     drawing = Drawing(515, 100)
     drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
@@ -165,7 +163,6 @@ def create_academy_report(data):
 
     levels = ["하", "중하", "중", "상", "최상"]
     points = []
-    
     for i in range(5):
         lvl = levels[i]
         try:
@@ -191,7 +188,7 @@ def create_academy_report(data):
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
-t_comment = Table(comment_box, colWidths=w_comment)
+    t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
@@ -207,7 +204,6 @@ t_comment = Table(comment_box, colWidths=w_comment)
     # --------------------------------------------------------------------
     story.append(Spacer(1, 15))
 
-    # 좌측 컬럼: 대표 우수 유형 (최대 3개)
     mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
     mastery_list = data.get("mastery_types", [])
     if not mastery_list:
@@ -217,7 +213,6 @@ t_comment = Table(comment_box, colWidths=w_comment)
             mastery_content.append(Paragraph(f"• {m_type}", body_style))
             mastery_content.append(Spacer(1, 4))
 
-    # 우측 컬럼: 대표 취약 유형 (최대 3개, 다크레드 강조 컬러 적용)
     section_style_red = ParagraphStyle('SectionRed', parent=section_style, textColor=colors.HexColor("#C53030"))
     weakness_content = [Paragraph("<b>■ 대표 취약 유형</b>", section_style_red), Spacer(1, 6)]
     weakness_list = data.get("weakness_types", [])
@@ -228,7 +223,6 @@ t_comment = Table(comment_box, colWidths=w_comment)
             weakness_content.append(Paragraph(f"• {w_type}", body_style))
             weakness_content.append(Spacer(1, 4))
 
-    # 표(Table) 배치를 활용해 한 행에 좌우 분할 정렬
     type_data = [[mastery_content, weakness_content]]
     type_table = Table(type_data, colWidths=[w_comment / 2 - 10, w_comment / 2 - 10])
     type_table.setStyle(TableStyle([
