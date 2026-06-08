@@ -212,37 +212,35 @@ def create_academy_report(data):
         ('LEFTPADDING', (0,0), (0,0), 10),
         ('RIGHTPADDING', (0,0), (0,0), 10),
     ]))
-    story.append(t_comment)
-    # ====================================================================
-    # [4단계 신설] 매쓰플랫 4페이지 기반 대표 우수/취약 유형 PDF 드로잉 로직
-    # ====================================================================
-  # ====================================================================
-    # [교정 완료] 대표 우수 유형 / 대표 취약 유형 2분할(좌우) 배치 레이아웃
-    # ====================================================================
+   story.append(t_comment) # <--- 기존 코드 위치 찾기
+
+    # --------------------------------------------------------------------
+    # [4단계] 대표 우수/취약 유형 (각 최대 3가지) 좌우 2분할 배치 레이아웃
+    # --------------------------------------------------------------------
     story.append(Spacer(1, 15))
 
-    # 좌측 열: 대표 우수 유형 콘텐츠 생성
+    # 좌측 컬럼: 대표 우수 유형 3가지
     mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
     mastery_list = data.get("mastery_types", [])
     if not mastery_list:
-        mastery_content.append(Paragraph("• 해당 사항 없음 (단원별 성취도 안정적)", body_style))
+        mastery_content.append(Paragraph("• 성취도 분석에 따라 전반적으로 안정적입니다.", body_style))
     else:
-        for m_type in mastery_list:
+        for m_type in mastery_list[:3]:  
             mastery_content.append(Paragraph(f"• {m_type}", body_style))
             mastery_content.append(Spacer(1, 4))
 
-    # 우측 열: 대표 취약 유형 콘텐츠 생성 (강조용 다크레드 스타일 적용)
+    # 우측 컬럼: 대표 취약 유형 3가지 (C53030 레드 컬러 강조)
     section_style_red = ParagraphStyle('SectionRed', parent=section_style, textColor=colors.HexColor("#C53030"))
     weakness_content = [Paragraph("<b>■ 대표 취약 유형</b>", section_style_red), Spacer(1, 6)]
     weakness_list = data.get("weakness_types", [])
     if not weakness_list:
-        weakness_content.append(Paragraph("• 해당 사항 없음 (특이 취약 유형 미검출)", body_style))
+        weakness_content.append(Paragraph("• 특이 취약 유형이 검출되지 않았습니다.", body_style))
     else:
-        for w_type in weakness_list:
+        for w_type in weakness_list[:3]:  
             weakness_content.append(Paragraph(f"• {w_type}", body_style))
             weakness_content.append(Spacer(1, 4))
 
-    # 두 콘텐츠를 묶어 한 줄에 나오도록 Table로 배치 (가로 폭을 정확히 반씩 분할)
+    # 표(Table) 구성을 통해 한 줄에 좌우로 정렬하여 배치
     type_data = [[mastery_content, weakness_content]]
     type_table = Table(type_data, colWidths=[w_comment / 2 - 10, w_comment / 2 - 10])
     type_table.setStyle(TableStyle([
@@ -253,7 +251,6 @@ def create_academy_report(data):
         ('TOPPADDING', (0, 0), (-1, -1), 0),
     ]))
     story.append(type_table)
-    # ====================================================================
     # ====================================================================
     
     def add_footer_logo(canvas, doc):
@@ -278,34 +275,40 @@ from pdf2image import convert_from_bytes
 
 # 명문 수학전문학원 원장의 학부모 카운셀링 블로그 문구를 사상 주입하는 특수 지시문
 system_prompt = """
-너는 강남 대치동 및 목동의 상위권 수학전문학원인 코넬수학에서 학부모 입학 상담을 전담하는 친절하고 깊이 있는 원장이야.
-매쓰플랫 원본 리포트를 정밀하게 확인하여 오차 없는 데이터 JSON을 빌드해라.
-특히 4페이지에 존재하는 '대표 우수 유형'과 '대표 취약 유형' 섹션의 문항 번호와 유형명을 완벽하게 추출해야 한다.
+너는 코넬수학전문학원의 원장이야. 첨부된 매쓰플랫 리포트(특히 4페이지)를 정밀 분석하여 오차 없는 데이터 JSON을 생성해라.
 
-[학부모 상담용 극도로 부드럽고 정중한 어조 지침]:
-1. 첫 문장은 무조건 "코넬수학에 관심을 가지고 소중한 자녀의 진단평가에 응해주셔서 깊이 감사드립니다."로 아주 따뜻하고 정중하게 출발할 것.
-2. 명령조나 지나치게 딱딱한 표현(요구됩니다, 필요합니다, 요망됩니다 등)은 전면 금지한다. 수학 전문 학원 블로그의 친절한 분석 글처럼 "~해보입니다", "~하는 성향을 띠고 있습니다", "~를 다져나간다면 충분히 성장할 수 있습니다"와 같은 서술어 구조로 부드럽게 감싸줄 것.
-3. 결론부에는 '코넬수학만의 차별화된 세심하고 밀착된 1대1 관리 시스템과 철저한 오답 보완 매커니즘을 결합하여, 부족했던 영역을 탄탄한 심화 개념으로 반전시키고 상위권으로 안심하고 도약할 수 있도록 저희 교사진이 사랑과 책임감으로 지도하겠습니다'라는 확신과 안도감을 주는 멘트로 마감할 것.
-4. 이 세부 조건들을 바탕으로 문맥을 스스로 5회 연속 리팩토링(5-turn refinement)하여 부드러움과 신뢰가 극대화된 완성형 코멘트(4~5문장)로 리턴해라.
+[추출 및 분석 핵심 지침]
+1. 대표 우수 유형 & 대표 취약 유형: 4페이지 데이터에서 가장 두드러지는 문항/유형을 '각각 정확히 3가지씩' 추출하여 리스트로 만들어라. (예: "8번 명제가 참이 되도록 하는 미지수 구하기")
+2. 난이도별 정답률 분석: 리포트에 표시된 최상, 상, 중, 중하, 하 각 난이도별 정답률(%) 수치를 정확하게 찾아내어 숫자로 매핑해라. 절대로 0%로 누락시키지 말고 정밀하게 스캔할 것.
 
 [반드시 지켜야 할 응답 JSON 형식]:
 {
-  "student_name": "교정된 학생 이름",
+  "student_name": "학생 이름",
   "school_name": "학교명",
   "student_grade": "학년",
-  "report_month": "YYYY/MM/DD 형식의 시험 일자",
+  "report_month": "YYYY/MM/DD",
   "score": "종합 점수 (숫자만)",
   "chapters": [
-    {"name": "올바른 단원명 1", "achievement": "성취도 숫자"},
-    {"name": "올바른 단원명 2", "achievement": "성취도 숫자"}
+    {"name": "단원명", "achievement": "성취도 숫자"}
   ],
+  "difficulty_analysis": {
+    "하": "하 정답률 숫자",
+    "중하": "중하 정답률 숫자",
+    "중": "중 정답률 숫자",
+    "상": "상 정답률 숫자",
+    "최상": "최상 정답률 숫자"
+  },
   "mastery_types": [
-    "8번 명제가 참이 되도록 하는 미지수 구하기"
+    "우수 유형 1번째 (예시)",
+    "우수 유형 2번째 (예시)",
+    "우수 유형 3번째 (예시)"
   ],
   "weakness_types": [
-    "11번 절댓값 기호를 포함한 절대부등식"
+    "취약 유형 1번째 (예시)",
+    "취약 유형 2번째 (예시)",
+    "취약 유형 3번째 (예시)"
   ],
-  "teacher_comment": "블로그 상담 패턴 기반으로 윤문된 부드럽고 정중한 원장님 종합 분석 의견"
+  "teacher_comment": "학부모 상담용 정중하고 부드러운 종합 코멘트 (4~5문장)"
 }
 """
 
@@ -390,22 +393,24 @@ if uploaded_file is not None:
     report_month = st.text_input("시험 일자 (년/월/일)", value=res.get("report_month", ""))
     score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
     
-    # 🌟 [난이도 칸 제거 후 신설] 4페이지 대표 우수 유형 및 대표 취약 유형 수정/검토 UI
-    st.markdown("#### 🔍 매쓰플랫 4페이지 심층 유형 분석 결과")
-    
-    default_mastery = "\n".join(res.get("mastery_types", [])) if isinstance(res.get("mastery_types"), list) else ""
-    default_weakness = "\n".join(res.get("weakness_types", [])) if isinstance(res.get("weakness_types"), list) else ""
-    
-    col_m, col_w = st.columns(2)
-    with col_m:
-        mastery_input = st.text_area("🏆 대표 우수 유형 (줄바꿈으로 구분)", value=default_mastery, height=120)
-    with col_w:
-        weakness_input = st.text_area("⚠️ 대표 취약 유형 (줄바꿈으로 구분)", value=default_weakness, height=120)
-    
-    # 수정 반영
-    res["mastery_types"] = [line.strip() for line in mastery_input.split("\n") if line.strip()]
-    res["weakness_types"] = [line.strip() for line in weakness_input.split("\n") if line.strip()]
-    
+      # --------------------------------------------------------------------
+    # [교정] 4페이지 유형 자동 연동 및 난이도별 정답률 분석 오류 수정
+    # --------------------------------------------------------------------
+    # 1. AI가 추출한 유형 데이터를 최대 3개까지만 칼같이 슬라이싱하여 고정
+    res["mastery_types"] = res.get("mastery_types", [])[:3]
+    res["weakness_types"] = res.get("weakness_types", [])[:3]
+
+    # 2. 난이도별 정답률 분석 0% 오류 해결 (AI 분석 원본 difficulty_analysis 구조 매핑)
+    diff_data = res.get("difficulty_analysis", {})
+    if isinstance(diff_data, dict):
+        # 파싱 딕셔너리에 수치가 문자로 들어올 경우를 대비해 안정적으로 변환 처리
+        res["difficulty_analysis"] = {
+            "하": diff_data.get("하", "0"),
+            "중하": diff_data.get("중하", "0"),
+            "중": diff_data.get("중", "0"),
+            "상": diff_data.get("상", "0"),
+            "최상": diff_data.get("최상", "0")
+        } 
     teacher_comment = st.text_area("🦅 코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
     
     res["student_name"] = student_name
