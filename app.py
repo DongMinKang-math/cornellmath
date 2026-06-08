@@ -1,48 +1,77 @@
+import streamlit as pd
 import streamlit as st
-from pypdf import PdfReader
-from openai import OpenAI
 import json
-import io
 import os
-import base64
-from pdf2image import convert_from_bytes
-# PDF 생성 및 정밀 시각화 부품 임포트
+import io
+import re
+from openai import OpenAI
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.graphics.shapes import Drawing, Rect, Line, Circle, String
-from streamlit_pdf_viewer import pdf_viewer
+from reportlab.graphics.shapes import Drawing, Rect, Line, String, Circle
 
-# 웹 페이지 설정 (브라우저 탭 아이콘을 📊 모양으로 고정)
-st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", page_icon="📊", layout="centered")
+# 페이지 기본 설정
+st.set_page_config(page_title="코넬수학 레벨테스트 결과지 시스템", page_icon="📊", layout="wide")
 
-st.title("📊 코넬수학전문학원 레벨테스트 결과지 시스템")
-st.caption("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
-st.markdown("---")
-
-# Secrets에서 안전하게 API Key 로드
+# OpenAI 클라이언트 초기화
 try:
-    api_key = st.secrets["OPENAI_API_KEY"]
-except Exception:
-    st.error("❌ Streamlit Cloud Settings -> Secrets에 'OPENAI_API_KEY'가 설정되지 않았습니다.")
-    st.stop()
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+except Exception as e:
+    st.error("⚠️ OpenAI API Key가 설정되지 않았습니다. Streamlit Secrets를 확인해 주세요.")
 
-# 점수에 따라 알파벳 레벨을 자동으로 계산하는 함수
 def calculate_math_level(score_str):
     try:
         score = int(''.join(filter(str.isdigit, str(score_str))))
-        if score >= 88: return "A"
-        elif score >= 72: return "B"
-        elif score >= 48: return "C"
-        elif score >= 20: return "D"
-        else: return "F"
     except:
-        return "C"
+        score = 0
+    if score >= 90: return "S"
+    elif score >= 80: return "A"
+    elif score >= 70: return "B"
+    elif score >= 60: return "C"
+    else: return "D"
 
-# PDF 성적표 생성 함수 정의
+# AI 프롬프트 정의 (대표 우수/취약 유형 각 3가지 및 난이도 정답률 타겟 고정)
+system_prompt = """
+너는 코넬수학전문학원의 원장이야. 첨부된 매쓰플랫 리포트(특히 4페이지)를 정밀 분석하여 오차 없는 데이터 JSON을 생성해라.
+
+[추출 및 분석 핵심 지침]
+1. 대표 우수 유형 & 대표 취약 유형: 4페이지 데이터에서 가장 두드러지는 문항/유형을 '각각 정확히 3가지씩' 추출하여 리스트로 만들어라. (예: "8번 명제가 참이 되도록 하는 미지수 구하기")
+2. 난이도별 정답률 분석: 리포트에 표시된 최상, 상, 중, 중하, 하 각 난이도별 정답률(%) 수치를 정확하게 찾아내어 숫자로 매핑해라. 절대로 0%로 누락시키지 말고 정밀하게 스캔할 것.
+
+[반드시 지켜야 할 응답 JSON 형식]:
+{
+  "student_name": "학생 이름",
+  "school_name": "학교명",
+  "student_grade": "학년",
+  "report_month": "YYYY/MM/DD",
+  "score": "종합 점수 (숫자만)",
+  "chapters": [
+    {"name": "단원명", "achievement": "성취도 숫자"}
+  ],
+  "difficulty_analysis": {
+    "하": "하 정답률 숫자",
+    "중하": "중하 정답률 숫자",
+    "중": "중 정답률 숫자",
+    "상": "상 정답률 숫자",
+    "최상": "최상 정답률 숫자"
+  },
+  "mastery_types": [
+    "우수 유형 1번째",
+    "우수 유형 2번째",
+    "우수 유형 3번째"
+  ],
+  "weakness_types": [
+    "취약 유형 1번째",
+    "취약 유형 2번째",
+    "취약 유형 3번째"
+  ],
+  "teacher_comment": "학부모 상담용 정중하고 부드러운 종합 코멘트 (4~5문장)"
+}
+"""
+
 def create_academy_report(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=40)
@@ -200,7 +229,7 @@ def create_academy_report(data):
     story.append(t_comment)
 
     # --------------------------------------------------------------------
-    # [교정 완료] 대표 우수 유형 / 대표 취약 유형 좌우 2분할 레이아웃
+    # [교정 신설] 대표 우수 유형 / 대표 취약 유형 좌우 2분할 레이아웃
     # --------------------------------------------------------------------
     story.append(Spacer(1, 15))
 
@@ -247,3 +276,117 @@ def create_academy_report(data):
     doc.build(story, onFirstPage=add_footer_logo, onLaterPages=add_footer_logo)
     buffer.seek(0)
     return buffer
+# ====================================================================
+# 메인 UI 대시보드 및 입력 수정창 기능 복구 영역
+# ====================================================================
+st.title("📊 코넬수학전문학원 레벨테스트 결과지 시스템")
+st.markdown("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
+st.markdown("---")
+
+uploaded_file = st.file_uploader("📥 매쓰플랫 진단평가 결과 분석 리포트 PDF 업로드", type=["pdf"])
+
+if uploaded_file is not None:
+    if "ocr_result" not in st.session_state or st.session_state.get("file_name") != uploaded_file.name:
+        with st.spinner("🔍 AI 원장님이 리포트 파일 분석 중... (약 10~15초 소요)"):
+            try:
+                import fitz
+                doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+                import base64
+                images_base64 = []
+                for page in doc:
+                    pix = page.get_pixmap(dpi=150)
+                    img_data = pix.tobytes("png")
+                    images_base64.append(base64.b64encode(img_data).decode('utf-8'))
+                
+                content = [{"type": "text", "text": system_prompt}]
+                for img_b64 in images_base64:
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_b64}"}
+                    })
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": content}],
+                    response_format={"type": "json_object"},
+                    temperature=0.2
+                )
+                
+                raw_text = response.choices[0].message.content
+                res_json = json.loads(raw_text)
+                st.session_state["ocr_result"] = res_json
+                st.session_state["file_name"] = uploaded_file.name
+            except Exception as e:
+                st.error(f"❌ 분석 중 에러 발생: {str(e)}")
+                st.stop()
+
+    res = st.session_state["ocr_result"]
+
+    # --------------------------------------------------------------------
+    # 원래 기능 완벽 복구: 대시보드 편집 폼 레이아웃
+    # --------------------------------------------------------------------
+    st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        s_name = st.text_input("학생 이름", value=res.get("student_name", ""))
+    with col2:
+        sch_name = st.text_input("학교명", value=res.get("school_name", ""))
+    with col3:
+        s_grade = st.text_input("학년", value=res.get("student_grade", ""))
+
+    col4, col5 = st.columns(2)
+    with col4:
+        r_month = st.text_input("평가 일자", value=res.get("report_month", ""))
+    with col5:
+        score_val = st.text_input("종합 점수", value=str(res.get("score", "")))
+
+    st.markdown("### 📈 2단계: 영역별 성취도 점수 검토")
+    updated_chapters = []
+    ch_list = res.get("chapters", [])
+    if ch_list:
+        cols = st.columns(len(ch_list))
+        for idx, ch in enumerate(ch_list):
+            with cols[idx]:
+                ch_name = st.text_input(f"영역 {idx+1} 이름", value=ch.get("name", ""), key=f"ch_n_{idx}")
+                ch_ach = st.text_input(f"성취도 (%)", value=str(ch.get("achievement", "")), key=f"ch_a_{idx}")
+                updated_chapters.append({"name": ch_name, "achievement": ch_ach})
+
+    # 난이도별 정답률 자동 세팅 및 싱크오류 방지
+    diff_data = res.get("difficulty_analysis", {})
+    res["difficulty_analysis"] = {
+        "하": diff_data.get("하", "0"),
+        "중하": diff_data.get("중하", "0"),
+        "중": diff_data.get("중", "0"),
+        "상": diff_data.get("상", "0"),
+        "최상": diff_data.get("최상", "0")
+    }
+
+    st.markdown("### 🦅 3단계: 종합 코멘트 관리")
+    teacher_comment = st.text_area("코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
+
+    # 데이터 최종 동기화 및 3개 유형 보장 슬라이싱
+    final_data = {
+        "student_name": s_name,
+        "school_name": sch_name,
+        "student_grade": s_grade,
+        "report_month": r_month,
+        "score": score_val,
+        "chapters": updated_chapters,
+        "difficulty_analysis": res["difficulty_analysis"],
+        "mastery_types": res.get("mastery_types", [])[:3],
+        "weakness_types": res.get("weakness_types", [])[:3],
+        "teacher_comment": teacher_comment
+    }
+
+    st.markdown("---")
+    st.markdown("### 🖨️ 4단계: 성적표 결과지 발행")
+    
+    if st.button("🔥 공식 PDF 분석 결과지 생성하기", type="primary"):
+        pdf_bin = create_academy_report(final_data)
+        st.success("🎉 결과지 작성이 성공적으로 완료되었습니다! 아래 다운로드 버튼을 눌러주세요.")
+        st.download_button(
+            label="💾 코넬수학 진단평가 결과지 PDF 다운로드",
+            data=pdf_bin,
+            file_name=f"코넬수학_진단결과분석지_{s_name}.pdf",
+            mime="application/pdf"
+        )
