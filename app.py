@@ -317,7 +317,6 @@ if uploaded_file is not None:
                 st.stop()
 
     res = st.session_state["ocr_result"]
-
 st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -352,7 +351,7 @@ st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
 
     st.markdown("---")
     
-    # [교정 완료] 들여쓰기를 상위 블록과 일치시켰습니다.
+    # PDF 바이너리 리포트 생성
     pdf_bin = create_academy_report(final_data)
 
     # 좌우 2분할 레이아웃 배치
