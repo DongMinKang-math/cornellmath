@@ -237,16 +237,90 @@ if uploaded_file is not None:
         if 'input_cleared' in st.session_state:
             del st.session_state['input_cleared']
 
+import base64 # 코드 상단 import 문에 추가하세요.
+
+# ... (create_academy_report 함수 등 기존 코드 유지)
+
+# --- 파일 업로드 화면 구성 (이 아래 부분을 수정) ---
+uploaded_file = st.file_uploader("매쓰플랫 레벨테스트 결과 PDF 파일을 선택하세요", type=["pdf"])
+
+if uploaded_file is not None:
+    # 세션 상태 초기화 로직 유지
+    if 'current_file' not in st.session_state or st.session_state['current_file'] != uploaded_file.name:
+        st.session_state['current_file'] = uploaded_file.name
+        if 'parsed_data' in st.session_state:
+            del st.session_state['parsed_data']
+        if 'input_cleared' in st.session_state:
+            del st.session_state['input_cleared']
+
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI가 수치 오차를 5회 교차 검증하고 부드러운 원장님 어조로 재윤문 중입니다..."):
+        # 스피너 멘트 수정
+        with st.spinner("코넬 AI가 매쓰플랫 리포트 이미지를 정밀 Vision 분석 및 수치 검증 중입니다..."):
             try:
-                reader = PdfReader(uploaded_file)
-                full_text = ""
-                for idx, page in enumerate(reader.pages, 1):
-                    text = page.extract_text()
-                    if text: full_text += text + "\n"
+                # 1. [Vision 도입 핵심] PDF를 이미지로 고해상도 변환 (300 DPI)
+                # uploaded_file의 바이너리를 읽어와 이미지로 변환합니다.
+                uploaded_file.seek(0) # 파일 읽기 위치 초기화
+                pdf_bytes = uploaded_file.read()
+                
+                # Windows 로컬 실행 시 poppler_path="C:/path/to/poppler/bin" 추가 필요할 수 있음
+                # Streamlit Cloud 배포 시에는 packages.txt 설정으로 생략 가능
+                try:
+                    images = convert_from_bytes(pdf_bytes, dpi=300)
+                except Exception as e:
+                    st.error(f"❌ PDF 이미지 변환 중 오류가 발생했습니다. (poppler 설치 확인 요망): {e}")
+                    st.stop()
+                
+                # GPT-4o Vision API에 보낼 이미지 메시지 배열 구성 (최대 2페이지까지만 분석 권장)
+                image_messages = []
+                for idx, img in enumerate(images):
+                    if idx >= 2: break # 매쓰플랫 주요 정보는 보통 1~2페이지에 있습니다.
+                    
+                    buffered = io.BytesIO()
+                    img.save(buffered, format="PNG")
+                    img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                    
+                    image_messages.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{img_base64}",
+                            "detail": "high" # 표 수치를 정확히 보기 위해 고해상도 모드 설정
+                        }
+                    })
 
                 client = OpenAI(api_key=api_key)
+                
+                # 기존의 System Prompt는 유지합니다.
+                # system_prompt = """너는 강남 대치동 및 목동의 상위권 수학전문학원인 코넬수학... (생략) """
+
+                # [Vision용 User Content 구성] 텍스트 프롬프트와 이미지를 병합
+                vision_user_content = [
+                    {
+                        "type": "text",
+                        "text": "첨부된 매쓰플랫 성적표 이미지에서 학생 정보, 종합 점수, 단원별 성취도(%), 난이도별 정답률(%)을 완벽하게 추출하여 JSON 포맷으로 출력해줘."
+                    }
+                ] + image_messages
+
+                # 2. [OpenAI API 호출] model="gpt-4o" 유지, messages 구조 변경
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt}, # 기존 프롬프트
+                        {"role": "user", "content": vision_user_content} # 이미지 포함된 컨텐트
+                    ],
+                    response_format={"type": "json_object"} # JSON 출력 고정 유지
+                )
+                
+                # 이후 JSON 파싱 및 데이터 로드 로직은 기존 코드 그대로 유지됩니다.
+                ai_raw_data = response.choices[0].message.content
+                st.session_state['parsed_data'] = json.loads(ai_raw_data)
+                st.success("🎉 코넬 Vision AI가 이미지 분석 및 상담 멘트 최적화를 완료했습니다!")
+                uploaded_file.seek(0) # 파일 포인터 원위치 (미리보기 등 대비)
+
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {e}")
+                uploaded_file.seek(0)
+
+    # (이후 결과 세부 정보 입력 및 검토 부분은 기존 코드 유지)
                 
                 # 명문 수학전문학원 원장의 학부모 카운셀링 블로그 문구를 완전하게 사상 주입하는 특수 지시문
                 system_prompt = """
