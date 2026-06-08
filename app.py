@@ -1,9 +1,9 @@
-import streamlit as pd
 import streamlit as st
 import json
 import os
 import io
 import re
+import base64
 from openai import OpenAI
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -33,12 +33,12 @@ def calculate_math_level(score_str):
     elif score >= 60: return "C"
     else: return "D"
 
-# AI 프롬프트 정의 (대표 우수/취약 유형 각 3가지 및 난이도 정답률 타겟 고정)
+# AI 프롬프트 정의
 system_prompt = """
 너는 코넬수학전문학원의 원장이야. 첨부된 매쓰플랫 리포트(특히 4페이지)를 정밀 분석하여 오차 없는 데이터 JSON을 생성해라.
 
 [추출 및 분석 핵심 지침]
-1. 대표 우수 유형 & 대표 취약 유형: 4페이지 데이터에서 가장 두드러지는 문항/유형을 '각각 정확히 3가지씩' 추출하여 리스트로 만들어라. (예: "8번 명제가 참이 되도록 하는 미지수 구하기")
+1. 대표 우수 유형 & 대표 취약 유형: 4페이지 데이터에서 가장 두드러지는 문항/유형을 '각각 정확히 3가지씩' 추출하여 리스트로 만들어라.
 2. 난이도별 정답률 분석: 리포트에 표시된 최상, 상, 중, 중하, 하 각 난이도별 정답률(%) 수치를 정확하게 찾아내어 숫자로 매핑해라. 절대로 0%로 누락시키지 말고 정밀하게 스캔할 것.
 
 [반드시 지켜야 할 응답 JSON 형식]:
@@ -82,7 +82,6 @@ def create_academy_report(data):
         pdfmetrics.registerFont(TTFont('CustomFont', font_filename))
         font_name = 'CustomFont'
     else:
-        st.warning(f"⚠️ 저장소에 {font_filename} 파일이 발견되지 않았습니다. 한글 폰트를 업로드해 주세요.")
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
         font_name = 'HeiseiMin-W3'
@@ -227,10 +226,6 @@ def create_academy_report(data):
         ('RIGHTPADDING', (0,0), (0,0), 10),
     ]))
     story.append(t_comment)
-
-    # --------------------------------------------------------------------
-    # [교정 신설] 대표 우수 유형 / 대표 취약 유형 좌우 2분할 레이아웃
-    # --------------------------------------------------------------------
     story.append(Spacer(1, 15))
 
     mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
@@ -277,7 +272,8 @@ def create_academy_report(data):
     buffer.seek(0)
     return buffer
 # ====================================================================
-# 메인 UI 대시보드 및 입력 수정창 기능 복구 영역
+# ====================================================================
+# [개편 완료] 실시간 결과지 미리보기 통합 대시보드
 # ====================================================================
 st.title("📊 코넬수학전문학원 레벨테스트 결과지 시스템")
 st.markdown("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
@@ -322,9 +318,6 @@ if uploaded_file is not None:
 
     res = st.session_state["ocr_result"]
 
-    # --------------------------------------------------------------------
-    # 원래 기능 완벽 복구: 대시보드 편집 폼 레이아웃
-    # --------------------------------------------------------------------
     st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -340,53 +333,45 @@ if uploaded_file is not None:
     with col5:
         score_val = st.text_input("종합 점수", value=str(res.get("score", "")))
 
-    st.markdown("### 📈 2단계: 영역별 성취도 점수 검토")
-    updated_chapters = []
-    ch_list = res.get("chapters", [])
-    if ch_list:
-        cols = st.columns(len(ch_list))
-        for idx, ch in enumerate(ch_list):
-            with cols[idx]:
-                ch_name = st.text_input(f"영역 {idx+1} 이름", value=ch.get("name", ""), key=f"ch_n_{idx}")
-                ch_ach = st.text_input(f"성취도 (%)", value=str(ch.get("achievement", "")), key=f"ch_a_{idx}")
-                updated_chapters.append({"name": ch_name, "achievement": ch_ach})
-
-    # 난이도별 정답률 자동 세팅 및 싱크오류 방지
-    diff_data = res.get("difficulty_analysis", {})
-    res["difficulty_analysis"] = {
-        "하": diff_data.get("하", "0"),
-        "중하": diff_data.get("중하", "0"),
-        "중": diff_data.get("중", "0"),
-        "상": diff_data.get("상", "0"),
-        "최상": diff_data.get("최상", "0")
-    }
-
-    st.markdown("### 🦅 3단계: 종합 코멘트 관리")
+    st.markdown("### 🦅 2단계: 종합 코멘트 관리")
     teacher_comment = st.text_area("코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
 
-    # 데이터 최종 동기화 및 3개 유형 보장 슬라이싱
+    # 최종 가공 데이터 빌드
     final_data = {
         "student_name": s_name,
         "school_name": sch_name,
         "student_grade": s_grade,
         "report_month": r_month,
         "score": score_val,
-        "chapters": updated_chapters,
-        "difficulty_analysis": res["difficulty_analysis"],
+        "chapters": res.get("chapters", []),
+        "difficulty_analysis": res.get("difficulty_analysis", {"하": "0", "중하": "0", "중": "0", "상": "0", "최상": "0"}),
         "mastery_types": res.get("mastery_types", [])[:3],
         "weakness_types": res.get("weakness_types", [])[:3],
         "teacher_comment": teacher_comment
     }
 
     st.markdown("---")
-    st.markdown("### 🖨️ 4단계: 성적표 결과지 발행")
     
-    if st.button("🔥 공식 PDF 분석 결과지 생성하기", type="primary"):
+    # 좌우 2분할 레이아웃 배치 (왼쪽: 다운로드 및 정보 / 오른쪽: 실시간 인앱 PDF 미리보기)
+    left_col, right_col = st.columns([1, 1.2])
+    
+    with left_col:
+        st.markdown("### 🖨️ 3단계: 성적표 결과지 발행")
         pdf_bin = create_academy_report(final_data)
-        st.success("🎉 결과지 작성이 성공적으로 완료되었습니다! 아래 다운로드 버튼을 눌러주세요.")
+        st.success("🎉 분석지 생성이 완료되었습니다. 아래 버튼을 눌러 소장하세요!")
         st.download_button(
             label="💾 코넬수학 진단평가 결과지 PDF 다운로드",
             data=pdf_bin,
             file_name=f"코넬수학_진단결과분석지_{s_name}.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            type="primary"
         )
+        
+    with right_col:
+        st.markdown("### 🔍 발급 예정 결과지 미리보기")
+        try:
+            base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
+            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="700px" type="application/pdf"></iframe>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
+        except Exception as display_err:
+            st.info("💡 브라우저 환경에 따라 미리보기가 지원되지 않을 수 있습니다. 다운로드 버튼을 이용해 주세요.")
