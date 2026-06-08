@@ -191,179 +191,65 @@ def create_academy_report(data):
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
-    t_comment = Table(comment_box, colWidths=w_comment)
+t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
         ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
         ('TOPPADDING', (0,0), (0,0), 8),
-        ('BOTTOMPADDING', (0,0),
-# ====================================================================
-# [교정 완료] 라인 208번 이후의 파일 업로드 및 AI 호출 전체 로직
-# ====================================================================
+        ('BOTTOMPADDING', (0,0), (0,0), 8),
+        ('LEFTPADDING', (0,0), (0,0), 10),
+        ('RIGHTPADDING', (0,0), (0,0), 10),
+    ]))
+    story.append(t_comment)
 
-import base64
-from pdf2image import convert_from_bytes
-
-# 명문 수학전문학원 원장의 학부모 카운셀링 블로그 문구를 사상 주입하는 특수 지시문
-system_prompt = """
-너는 코넬수학전문학원의 원장이야. 첨부된 매쓰플랫 리포트(특히 4페이지)를 정밀 분석하여 오차 없는 데이터 JSON을 생성해라.
-
-[추출 및 분석 핵심 지침]
-1. 대표 우수 유형 & 대표 취약 유형: 4페이지 데이터에서 가장 두드러지는 문항/유형을 '각각 정확히 3가지씩' 추출하여 리스트로 만들어라. (예: "8번 명제가 참이 되도록 하는 미지수 구하기")
-2. 난이도별 정답률 분석: 리포트에 표시된 최상, 상, 중, 중하, 하 각 난이도별 정답률(%) 수치를 정확하게 찾아내어 숫자로 매핑해라. 절대로 0%로 누락시키지 말고 정밀하게 스캔할 것.
-
-[반드시 지켜야 할 응답 JSON 형식]:
-{
-  "student_name": "학생 이름",
-  "school_name": "학교명",
-  "student_grade": "학년",
-  "report_month": "YYYY/MM/DD",
-  "score": "종합 점수 (숫자만)",
-  "chapters": [
-    {"name": "단원명", "achievement": "성취도 숫자"}
-  ],
-  "difficulty_analysis": {
-    "하": "하 정답률 숫자",
-    "중하": "중하 정답률 숫자",
-    "중": "중 정답률 숫자",
-    "상": "상 정답률 숫자",
-    "최상": "최상 정답률 숫자"
-  },
-  "mastery_types": [
-    "우수 유형 1번째 (예시)",
-    "우수 유형 2번째 (예시)",
-    "우수 유형 3번째 (예시)"
-  ],
-  "weakness_types": [
-    "취약 유형 1번째 (예시)",
-    "취약 유형 2번째 (예시)",
-    "취약 유형 3번째 (예시)"
-  ],
-  "teacher_comment": "학부모 상담용 정중하고 부드러운 종합 코멘트 (4~5문장)"
-}
-"""
-
-# 파일 업로드 화면 구성
-uploaded_file = st.file_uploader("매쓰플랫 레벨테스트 결과 PDF 파일을 선택하세요", type=["pdf"], key="mathflat_uploader")
-
-if uploaded_file is not None:
-    if 'current_file' not in st.session_state or st.session_state['current_file'] != uploaded_file.name:
-        st.session_state['current_file'] = uploaded_file.name
-        if 'parsed_data' in st.session_state:
-            del st.session_state['parsed_data']
-        if 'input_cleared' in st.session_state:
-            del st.session_state['input_cleared']
-
-    if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI가 매쓰플랫 리포트 전체 페이지(우수/취약 유형 포함)를 정밀 Vision 분석 중입니다..."):
-            try:
-                uploaded_file.seek(0)
-                pdf_bytes = uploaded_file.read()
-                
-                # 4페이지 데이터까지 안정적으로 읽기 위해 전체 페이지 이미지 변환
-                images = convert_from_bytes(pdf_bytes, dpi=300)
-                
-                # 4페이지 분석을 위해 최대 5페이지까지 GPT-4o로 전송
-                image_messages = []
-                for idx, img in enumerate(images):
-                    if idx >= 5: 
-                        break
-                    buffered = io.BytesIO()
-                    img.save(buffered, format="PNG")
-                    img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                    
-                    image_messages.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{img_base64}",
-                            "detail": "high"
-                        }
-                    })
-
-                vision_user_content = [
-                    {
-                        "type": "text",
-                        "text": "첨부된 매쓰플랫 성적표 이미지에서 학생 정보, 종합 점수, 단원별 성취도(%)를 추출하고, 특히 4페이지에 있는 '대표 우수 유형'과 '대표 취약 유형'의 문항 번호와 내용을 정확히 추출해서 지정된 JSON 포맷으로 응답해줘."
-                    }
-                ] + image_messages
-
-                client = OpenAI(api_key=api_key)
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": vision_user_content}
-                    ],
-                    response_format={"type": "json_object"}
-                )
-                
-                ai_raw_data = response.choices[0].message.content
-                st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 Vision AI가 4페이지 상세 유형 분석 및 상담 멘트 최적화를 완료했습니다!")
-                uploaded_file.seek(0)
-
-            except Exception as e:
-                st.error(f"AI 분석 중 오류가 발생했습니다: {e}")
-                uploaded_file.seek(0)
-                st.stop()
-
-    # 데이터 바인딩 및 화면 검토 영역
-    res = st.session_state['parsed_data']
-    
-    st.markdown("---")
-    st.subheader("🎯 입학 상담용 결과지 세부 정보 입력 및 검토")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        student_name = st.text_input("학생 이름 (필수 입력)", value=res.get("student_name", ""))
-    with col2:
-        school_name = st.text_input("학교명 입력", value=res.get("school_name", ""))
-    with col3:
-        student_grade = st.text_input("학년 입력", value=res.get("student_grade", ""))
-        
-    report_month = st.text_input("시험 일자 (년/월/일)", value=res.get("report_month", ""))
-    score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
-    
-      # --------------------------------------------------------------------
-    # [교정] 4페이지 유형 자동 연동 및 난이도별 정답률 분석 오류 수정
     # --------------------------------------------------------------------
-    # 1. AI가 추출한 유형 데이터를 최대 3개까지만 칼같이 슬라이싱하여 고정
-    res["mastery_types"] = res.get("mastery_types", [])[:3]
-    res["weakness_types"] = res.get("weakness_types", [])[:3]
+    # [교정 완료] 대표 우수 유형 / 대표 취약 유형 좌우 2분할 레이아웃
+    # --------------------------------------------------------------------
+    story.append(Spacer(1, 15))
 
-    # 2. 난이도별 정답률 분석 0% 오류 해결 (AI 분석 원본 difficulty_analysis 구조 매핑)
-    diff_data = res.get("difficulty_analysis", {})
-    if isinstance(diff_data, dict):
-        # 파싱 딕셔너리에 수치가 문자로 들어올 경우를 대비해 안정적으로 변환 처리
-        res["difficulty_analysis"] = {
-            "하": diff_data.get("하", "0"),
-            "중하": diff_data.get("중하", "0"),
-            "중": diff_data.get("중", "0"),
-            "상": diff_data.get("상", "0"),
-            "최상": diff_data.get("최상", "0")
-        } 
-    teacher_comment = st.text_area("🦅 코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
-    
-    res["student_name"] = student_name
-    res["school_name"] = school_name
-    res["student_grade"] = student_grade
-    res["report_month"] = report_month
-    res["score"] = score
-    res["teacher_comment"] = teacher_comment
-    
-    try:
-        pdf_data = create_academy_report(res)
-        st.markdown("---")
-        st.subheader("👀 결과지 실시간 미리보기")
-        pdf_viewer(input=pdf_data.getvalue(), width=700)
-        
-        st.markdown("---")
-        st.subheader("🖨️ 최종 결과지 인쇄 발행")
-        st.download_button(
-            label="📥 코넬수학 레벨테스트 결과지 PDF 다운로드",
-            data=pdf_data,
-            file_name=f"{student_name if student_name else '신규생'}_코넬수학_레벨테스트_결과지.pdf",
-            mime="application/pdf"
-        )
-    except Exception as pdf_err:
-        st.error(f"PDF 렌더링 중 디자인 에러 발생: {pdf_err}")
+    # 좌측 컬럼: 대표 우수 유형 (최대 3개)
+    mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
+    mastery_list = data.get("mastery_types", [])
+    if not mastery_list:
+        mastery_content.append(Paragraph("• 성취도 분석에 따라 전반적으로 안정적입니다.", body_style))
+    else:
+        for m_type in mastery_list[:3]:
+            mastery_content.append(Paragraph(f"• {m_type}", body_style))
+            mastery_content.append(Spacer(1, 4))
+
+    # 우측 컬럼: 대표 취약 유형 (최대 3개, 다크레드 강조 컬러 적용)
+    section_style_red = ParagraphStyle('SectionRed', parent=section_style, textColor=colors.HexColor("#C53030"))
+    weakness_content = [Paragraph("<b>■ 대표 취약 유형</b>", section_style_red), Spacer(1, 6)]
+    weakness_list = data.get("weakness_types", [])
+    if not weakness_list:
+        weakness_content.append(Paragraph("• 특이 취약 유형이 검출되지 않았습니다.", body_style))
+    else:
+        for w_type in weakness_list[:3]:
+            weakness_content.append(Paragraph(f"• {w_type}", body_style))
+            weakness_content.append(Spacer(1, 4))
+
+    # 표(Table) 배치를 활용해 한 행에 좌우 분할 정렬
+    type_data = [[mastery_content, weakness_content]]
+    type_table = Table(type_data, colWidths=[w_comment / 2 - 10, w_comment / 2 - 10])
+    type_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(type_table)
+
+    def add_footer_logo(canvas, doc):
+        canvas.saveState()
+        logo_filename = "cornell.png"
+        if os.path.exists(logo_filename):
+            try:
+                canvas.drawImage(logo_filename, 242, 10, width=110, height=42, mask='auto')
+            except:
+                pass
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=add_footer_logo, onLaterPages=add_footer_logo)
+    buffer.seek(0)
+    return buffer
