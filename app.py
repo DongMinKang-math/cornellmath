@@ -318,7 +318,7 @@ if uploaded_file is not None:
 
     res = st.session_state["ocr_result"]
 st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
-    col1, col2, col3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
     with col1:
         s_name = st.text_input("학생 이름", value=res.get("student_name", ""))
     with col2:
