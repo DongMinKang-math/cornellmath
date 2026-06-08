@@ -318,7 +318,7 @@ if uploaded_file is not None:
 
     res = st.session_state["ocr_result"]
 
-    st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
+st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
     col1, col2, col3 = st.columns(3)
     with col1:
         s_name = st.text_input("학생 이름", value=res.get("student_name", ""))
@@ -350,12 +350,12 @@ if uploaded_file is not None:
         "teacher_comment": teacher_comment
     }
 
-st.markdown("---")
+    st.markdown("---")
     
-    # [교정 완료] 변수 범위(Scope) 분리 오류 해결: PDF 바이너리를 먼저 생성한 후 레이아웃에 뿌립니다.
+    # [교정 완료] 들여쓰기를 상위 블록과 일치시켰습니다.
     pdf_bin = create_academy_report(final_data)
 
-    # 좌우 2분할 레이아웃 배치 (왼쪽: 다운로드 안내 및 버튼 / 오른쪽: 실시간 인앱 PDF 미리보기)
+    # 좌우 2분할 레이아웃 배치
     left_col, right_col = st.columns([1, 1.2])
     
     with left_col:
@@ -372,12 +372,9 @@ st.markdown("---")
     with right_col:
         st.markdown("### 🔍 발급 예정 결과지 미리보기")
         try:
-            # 공식 pdf_viewer 모듈을 호출하여 깨짐 없이 즉시 렌더링합니다.
             from streamlit_pdf_viewer import pdf_viewer
             pdf_viewer(input=pdf_bin.getvalue(), width=700, height=800)
-            
         except Exception as display_err:
-            # 만약 라이브러리 로딩에 실패할 경우를 대비한 백업 대안책 (iframe)
             import base64
             base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
             pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="700px" type="application/pdf"></iframe>'
