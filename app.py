@@ -4,7 +4,8 @@ from openai import OpenAI
 import json
 import io
 import os
-
+import base64
+from pdf2image import convert_from_bytes
 # PDF 생성 및 정밀 시각화 부품 임포트
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
@@ -236,7 +237,8 @@ from pdf2image import convert_from_bytes
 # 명문 수학전문학원 원장의 학부모 카운셀링 블로그 문구를 사상 주입하는 특수 지시문
 system_prompt = """
 너는 강남 대치동 및 목동의 상위권 수학전문학원인 코넬수학에서 학부모 입학 상담을 전담하는 친절하고 깊이 있는 원장이야.
-매쓰플랫 원본의 난이도별 데이터 수치 보고서를 정밀하게 확인하여 오차 없는 데이터 JSON을 빌드해라.
+매쓰플랫 원본 리포트를 정밀하게 확인하여 오차 없는 데이터 JSON을 빌드해라.
+특히 4페이지에 존재하는 '대표 우수 유형'과 '대표 취약 유형' 섹션의 문항 번호와 유형명을 완벽하게 추출해야 한다.
 
 [학부모 상담용 극도로 부드럽고 정중한 어조 지침]:
 1. 첫 문장은 무조건 "코넬수학에 관심을 가지고 소중한 자녀의 진단평가에 응해주셔서 깊이 감사드립니다."로 아주 따뜻하고 정중하게 출발할 것.
@@ -255,22 +257,20 @@ system_prompt = """
     {"name": "올바른 단원명 1", "achievement": "성취도 숫자"},
     {"name": "올바른 단원명 2", "achievement": "성취도 숫자"}
   ],
-  "difficulty": {
-    "최상": "최상 정답률 숫자",
-    "상": "상 정답률 숫자",
-    "중": "중 정답률 숫자",
-    "중하": "중하 정답률 숫자",
-    "하": "하 정답률 숫자"
-  },
+  "mastery_types": [
+    "8번 명제가 참이 되도록 하는 미지수 구하기"
+  ],
+  "weakness_types": [
+    "11번 절댓값 기호를 포함한 절대부등식"
+  ],
   "teacher_comment": "블로그 상담 패턴 기반으로 윤문된 부드럽고 정중한 원장님 종합 분석 의견"
 }
 """
 
-# 파일 업로드 화면 구성 (딱 한 번만 선언하여 Duplicate ID 에러 원천 차단)
+# 파일 업로드 화면 구성
 uploaded_file = st.file_uploader("매쓰플랫 레벨테스트 결과 PDF 파일을 선택하세요", type=["pdf"], key="mathflat_uploader")
 
 if uploaded_file is not None:
-    # 세션 상태 초기화 로직
     if 'current_file' not in st.session_state or st.session_state['current_file'] != uploaded_file.name:
         st.session_state['current_file'] = uploaded_file.name
         if 'parsed_data' in st.session_state:
@@ -279,22 +279,18 @@ if uploaded_file is not None:
             del st.session_state['input_cleared']
 
     if 'parsed_data' not in st.session_state:
-        with st.spinner("코넬 AI가 매쓰플랫 리포트 이미지를 정밀 Vision 분석 및 수치 검증 중입니다..."):
+        with st.spinner("코넬 AI가 매쓰플랫 리포트 전체 페이지(우수/취약 유형 포함)를 정밀 Vision 분석 중입니다..."):
             try:
-                # 1. PDF를 고해상도 이미지로 변환 (300 DPI)
                 uploaded_file.seek(0)
                 pdf_bytes = uploaded_file.read()
                 
-                try:
-                    images = convert_from_bytes(pdf_bytes, dpi=300)
-                except Exception as e:
-                    st.error(f"❌ PDF 이미지 변환 중 오류가 발생했습니다. (packages.txt의 poppler-utils 설치를 확인하세요): {e}")
-                    st.stop()
+                # 4페이지 데이터까지 안정적으로 읽기 위해 전체 페이지 이미지 변환
+                images = convert_from_bytes(pdf_bytes, dpi=300)
                 
-                # GPT-4o Vision API 전송용 이미지 배열 구성 (최대 2페이지)
+                # 4페이지 분석을 위해 최대 5페이지까지 GPT-4o로 전송
                 image_messages = []
                 for idx, img in enumerate(images):
-                    if idx >= 2: 
+                    if idx >= 5: 
                         break
                     buffered = io.BytesIO()
                     img.save(buffered, format="PNG")
@@ -308,15 +304,13 @@ if uploaded_file is not None:
                         }
                     })
 
-                # Vision 기반 User 컨텐트 생성
                 vision_user_content = [
                     {
                         "type": "text",
-                        "text": "첨부된 매쓰플랫 성적표 이미지에서 학생 정보, 종합 점수, 단원별 성취도(%), 난이도별 정답률(%)을 완벽하게 추출하여 지정된 JSON 포맷으로 출력해줘."
+                        "text": "첨부된 매쓰플랫 성적표 이미지에서 학생 정보, 종합 점수, 단원별 성취도(%)를 추출하고, 특히 4페이지에 있는 '대표 우수 유형'과 '대표 취약 유형'의 문항 번호와 내용을 정확히 추출해서 지정된 JSON 포맷으로 응답해줘."
                     }
                 ] + image_messages
 
-                # 2. OpenAI GPT-4o 단일 호출 (중복 호출 제거)
                 client = OpenAI(api_key=api_key)
                 response = client.chat.completions.create(
                     model="gpt-4o",
@@ -329,7 +323,7 @@ if uploaded_file is not None:
                 
                 ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
-                st.success("🎉 코넬 Vision AI가 이미지 분석 및 상담 멘트 최적화를 완료했습니다!")
+                st.success("🎉 코넬 Vision AI가 4페이지 상세 유형 분석 및 상담 멘트 최적화를 완료했습니다!")
                 uploaded_file.seek(0)
 
             except Exception as e:
@@ -354,26 +348,24 @@ if uploaded_file is not None:
     report_month = st.text_input("시험 일자 (년/월/일)", value=res.get("report_month", ""))
     score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
     
-    st.markdown("#### 📊 난이도별 정답률 확인 (최종 조율창)")
-    diff_obj = res.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
+    # 🌟 [난이도 칸 제거 후 신설] 4페이지 대표 우수 유형 및 대표 취약 유형 수정/검토 UI
+    st.markdown("#### 🔍 매쓰플랫 4페이지 심층 유형 분석 결과")
     
-    d_col1, d_col2, d_col3, d_col4, d_col5 = st.columns(5)
-    with d_col1:
-        d_ha = st.text_input("하 (%)", value=str(diff_obj.get("하", "0")))
-    with d_col2:
-        d_mid_ha = st.text_input("중하 (%)", value=str(diff_obj.get("중하", "0")))
-    with d_col3:
-        d_mid = st.text_input("중 (%)", value=str(diff_obj.get("중", "0")))
-    with d_col4:
-        d_sang = st.text_input("상 (%)", value=str(diff_obj.get("상", "0")))
-    with d_col5:
-        d_choi = st.text_input("최상 (%)", value=str(diff_obj.get("최상", "0")))
-        
-    res["difficulty"] = {"하": d_ha, "중하": d_mid_ha, "중": d_mid, "상": d_sang, "최상": d_choi}
+    default_mastery = "\n".join(res.get("mastery_types", [])) if isinstance(res.get("mastery_types"), list) else ""
+    default_weakness = "\n".join(res.get("weakness_types", [])) if isinstance(res.get("weakness_types"), list) else ""
     
-    teacher_comment = st.text_area("🦅 코넬 분석 Comment (학원 블로그 스타일 기반 초안 / 수정 가능)", value=res.get("teacher_comment", ""), height=150)
+    col_m, col_w = st.columns(2)
+    with col_m:
+        mastery_input = st.text_area("🏆 대표 우수 유형 (줄바꿈으로 구분)", value=default_mastery, height=120)
+    with col_w:
+        weakness_input = st.text_area("⚠️ 대표 취약 유형 (줄바꿈으로 구분)", value=default_weakness, height=120)
     
-    # 수정된 데이터 최종 반영
+    # 수정 반영
+    res["mastery_types"] = [line.strip() for line in mastery_input.split("\n") if line.strip()]
+    res["weakness_types"] = [line.strip() for line in weakness_input.split("\n") if line.strip()]
+    
+    teacher_comment = st.text_area("🦅 코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
+    
     res["student_name"] = student_name
     res["school_name"] = school_name
     res["student_grade"] = student_grade
@@ -381,7 +373,6 @@ if uploaded_file is not None:
     res["score"] = score
     res["teacher_comment"] = teacher_comment
     
-    # PDF 보고서 생성 및 미리보기
     try:
         pdf_data = create_academy_report(res)
         st.markdown("---")
@@ -396,6 +387,5 @@ if uploaded_file is not None:
             file_name=f"{student_name if student_name else '신규생'}_코넬수학_레벨테스트_결과지.pdf",
             mime="application/pdf"
         )
-        st.info("💡 위 미리보기를 검토하신 후 다운로드하여 바로 인쇄(A4 세로)하시면 됩니다.")
     except Exception as pdf_err:
         st.error(f"PDF 렌더링 중 디자인 에러 발생: {pdf_err}")
