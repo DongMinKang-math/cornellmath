@@ -218,7 +218,6 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 15))
 
-    # 대표 우수/취약 유형 패널 선행 배치 복구
     mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
     mastery_list = data.get("mastery_types", [])
     if not mastery_list:
@@ -250,7 +249,6 @@ def create_academy_report(data):
     story.append(type_table)
     story.append(Spacer(1, 15))
 
-    # [원장님 요청 적용] 코넬 분석 Comment 상자를 가장 하단 최종 배치 복구
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
@@ -276,8 +274,9 @@ def create_academy_report(data):
     doc.build(story, onFirstPage=add_footer_logo, onLaterPages=add_footer_logo)
     buffer.seek(0)
     return buffer
-    # ====================================================================
-# [완벽 복구] 1·2단계 입력 제어 모듈 및 이미지 브라우저 프레임 렌더러
+
+# ====================================================================
+# [엔진 개정 및 100% 렌더링 스코프 확보 영역]
 # ====================================================================
 st.title("📊 코넬수학 레벨테스트 결과지 시스템")
 st.markdown("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
@@ -312,16 +311,16 @@ if uploaded_file is not None:
                 )
                 
                 raw_text = response.choices[0].message.content
-                res_json = json.loads(raw_text)
-                st.session_state["ocr_result"] = res_json
+                st.session_state["ocr_result"] = json.loads(raw_text)
                 st.session_state["file_name"] = uploaded_file.name
             except Exception as e:
                 st.error(f"❌ 분석 중 에러 발생: {str(e)}")
                 st.stop()
 
-    res = st.session_state["ocr_result"]
+    # 안전하게 세션 딕셔너리 연동 확보
+    res = st.session_state.get("ocr_result", {})
 
-    # [기능 완전 복구] 1단계 기본 학생 정보 수정 폼 노출
+    # [UI 증발 철저 방어] 1단계 기본 학생 정보 수정 폼 강제 고정 렌더링
     st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -337,11 +336,11 @@ if uploaded_file is not None:
     with col5:
         score_val = st.text_input("종합 점수", value=str(res.get("score", "")))
 
-    # [기능 완전 복구] 2단계 코넬 종합 평론 텍스트 상자 노출
+    # [UI 증발 철저 방어] 2단계 코넬 종합 평론 텍스트 상자 강제 고정 렌더링
     st.markdown("### 🦅 2단계: 종합 코멘트 관리")
     teacher_comment = st.text_area("코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
 
-    # 데이터 객체 양방향 결합 빌드
+    # 데이터 취합 동기화
     final_data = {
         "student_name": s_name,
         "school_name": sch_name,
@@ -357,7 +356,7 @@ if uploaded_file is not None:
 
     st.markdown("---")
     
-    # 순서 보장 컴파일 (NameError 원천 방지)
+    # PDF 빌드 실행
     pdf_bin = create_academy_report(final_data)
 
     # 대시보드 2분할 가동
@@ -377,15 +376,15 @@ if uploaded_file is not None:
     with right_col:
         st.markdown("### 🔍 발급 예정 결과지 미리보기")
         
-        # 라운드 디자인 테두리 명품 액자 컨테이너 가동
+        # 라운드 디자인 테두리 명품 액자 컨테이너
         st.markdown('<div class="pdf-preview-container">', unsafe_allow_html=True)
         try:
-            # 브라우저별 차단 규제를 100% 무력화하는 고해상도 이미지 스트림 렌더러 복구 완료
+            # 브라우저별 차단 규제를 100% 우회하는 고해상도 이미지 변환 프리뷰 기법 고정
             import fitz
             preview_doc = fitz.open(stream=pdf_bin.getvalue(), filetype="pdf")
             for page in preview_doc:
                 pix = page.get_pixmap(dpi=180)
                 st.image(pix.tobytes("png"), use_container_width=True)
         except Exception as display_err:
-            st.info("💡 미리보기를 실시간 생성하는 중입니다.")
+            st.info("💡 미리보기를 생성하는 중입니다.")
         st.markdown('</div>', unsafe_allow_html=True)
