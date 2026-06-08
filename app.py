@@ -235,18 +235,16 @@ if uploaded_file is not None:
             type="primary"
         )
         
-    with right_col:
+with right_col:
         st.markdown("### 🔍 발급 예정 결과지 미리보기")
         
-        # 원장님 요청: 미리보기 창에 세련된 액자형 테두리(그림자 포함) 컨테이너 생성
+        # 디자인 컨테이너 시작
         st.markdown('<div class="pdf-preview-container">', unsafe_allow_html=True)
-        try:
-            from streamlit_pdf_viewer import pdf_viewer
-            # 테두리 가로 폭에 꽉 차게 맞춤 연동
-            pdf_viewer(input=pdf_bin.getvalue(), width=720, height=800)
-        except Exception as display_err:
-            import base64
-            base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="700px" type="application/pdf"></iframe>'
-            st.markdown(pdf_display, unsafe_allow_html=True)
+        
+        # 가장 안정적인 base64 임베딩 방식으로 강제 렌더링
+        import base64
+        base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px" type="application/pdf"></iframe>'
+        st.markdown(pdf_display, unsafe_allow_html=True)
+            
         st.markdown('</div>', unsafe_allow_html=True)
