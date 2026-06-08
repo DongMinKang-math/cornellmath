@@ -216,29 +216,44 @@ def create_academy_report(data):
     # ====================================================================
     # [4단계 신설] 매쓰플랫 4페이지 기반 대표 우수/취약 유형 PDF 드로잉 로직
     # ====================================================================
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("<b>■ 코넬수학 선정 대표 우수 유형</b>", section_style))
-    story.append(Spacer(1, 6))
-    
+  # ====================================================================
+    # [교정 완료] 대표 우수 유형 / 대표 취약 유형 2분할(좌우) 배치 레이아웃
+    # ====================================================================
+    story.append(Spacer(1, 15))
+
+    # 좌측 열: 대표 우수 유형 콘텐츠 생성
+    mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
     mastery_list = data.get("mastery_types", [])
     if not mastery_list:
-        story.append(Paragraph("• 해당 사항 없음 (단원별 성취도 안정적)", body_style))
+        mastery_content.append(Paragraph("• 해당 사항 없음 (단원별 성취도 안정적)", body_style))
     else:
         for m_type in mastery_list:
-            story.append(Paragraph(f"• {m_type}", body_style))
-            story.append(Spacer(1, 4))
+            mastery_content.append(Paragraph(f"• {m_type}", body_style))
+            mastery_content.append(Spacer(1, 4))
 
-    story.append(Spacer(1, 15))
-    story.append(Paragraph("<b>■ 우선 보완 대표 취약 유형</b>", section_style))
-    story.append(Spacer(1, 6))
-    
+    # 우측 열: 대표 취약 유형 콘텐츠 생성 (강조용 다크레드 스타일 적용)
+    section_style_red = ParagraphStyle('SectionRed', parent=section_style, textColor=colors.HexColor("#C53030"))
+    weakness_content = [Paragraph("<b>■ 대표 취약 유형</b>", section_style_red), Spacer(1, 6)]
     weakness_list = data.get("weakness_types", [])
     if not weakness_list:
-        story.append(Paragraph("• 해당 사항 없음 (특이 취약 유형 미검출)", body_style))
+        weakness_content.append(Paragraph("• 해당 사항 없음 (특이 취약 유형 미검출)", body_style))
     else:
         for w_type in weakness_list:
-            story.append(Paragraph(f"• {w_type}", body_style))
-            story.append(Spacer(1, 4))
+            weakness_content.append(Paragraph(f"• {w_type}", body_style))
+            weakness_content.append(Spacer(1, 4))
+
+    # 두 콘텐츠를 묶어 한 줄에 나오도록 Table로 배치 (가로 폭을 정확히 반씩 분할)
+    type_data = [[mastery_content, weakness_content]]
+    type_table = Table(type_data, colWidths=[w_comment / 2 - 10, w_comment / 2 - 10])
+    type_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(type_table)
+    # ====================================================================
     # ====================================================================
     
     def add_footer_logo(canvas, doc):
