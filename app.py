@@ -148,8 +148,9 @@ st.markdown("---")
 uploaded_file = st.file_uploader("📥 매쓰플랫 진단평가 결과 분석 리포트 PDF 업로드", type=["pdf"])
 
 if uploaded_file is not None:
+    # 1. AI 분석 로직 (기존 유지)
     if "ocr_result" not in st.session_state or st.session_state.get("file_name") != uploaded_file.name:
-        with st.spinner("🔍 AI 원장님이 리포트 파일 분석 중... (약 10~15초 소요)"):
+        with st.spinner("🔍 AI 원장님이 리포트 파일 분석 중..."):
             try:
                 import fitz
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
@@ -157,15 +158,11 @@ if uploaded_file is not None:
                 images_base64 = []
                 for page in doc:
                     pix = page.get_pixmap(dpi=150)
-                    img_data = pix.tobytes("png")
-                    images_base64.append(base64.b64encode(img_data).decode('utf-8'))
+                    images_base64.append(base64.b64encode(pix.tobytes("png")).decode('utf-8'))
                 
                 content = [{"type": "text", "text": system_prompt}]
                 for img_b64 in images_base64:
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img_b64}"}
-                    })
+                    content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}})
                 
                 response = client.chat.completions.create(
                     model="gpt-4o",
@@ -173,43 +170,33 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"},
                     temperature=0.2
                 )
-                
-                raw_text = response.choices[0].message.content
-                res_json = json.loads(raw_text)
+                res_json = json.loads(response.choices[0].message.content)
                 st.session_state["ocr_result"] = res_json
                 st.session_state["file_name"] = uploaded_file.name
             except Exception as e:
-                st.error(f"❌ 분석 중 에러 발생: {str(e)}")
+                st.error(f"❌ 분석 오류: {str(e)}")
                 st.stop()
 
     res = st.session_state["ocr_result"]
 
-    st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
+    # 2. 사용자 입력 폼
+    st.markdown("### 📋 1단계: 기본 정보 검토")
     col1, col2, col3 = st.columns(3)
-    with col1:
-        s_name = st.text_input("학생 이름", value=res.get("student_name", ""))
-    with col2:
-        sch_name = st.text_input("학교명", value=res.get("school_name", ""))
-    with col3:
-        s_grade = st.text_input("학년", value=res.get("student_grade", ""))
-
+    s_name = col1.text_input("학생 이름", value=res.get("student_name", ""))
+    sch_name = col2.text_input("학교명", value=res.get("school_name", ""))
+    s_grade = col3.text_input("학년", value=res.get("student_grade", ""))
+    
     col4, col5 = st.columns(2)
-    with col4:
-        r_month = st.text_input("평가 일자", value=res.get("report_month", ""))
-    with col5:
-        score_val = st.text_input("종합 점수", value=str(res.get("score", "")))
+    r_month = col4.text_input("평가 일자", value=res.get("report_month", ""))
+    score_val = col5.text_input("종합 점수", value=str(res.get("score", "")))
 
     st.markdown("### 🦅 2단계: 종합 코멘트 관리")
     teacher_comment = st.text_area("코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
 
-    # 최종 가공 데이터 빌드
+    # 3. PDF 생성 및 미리보기 레이아웃
     final_data = {
-        "student_name": s_name,
-        "school_name": sch_name,
-        "student_grade": s_grade,
-        "report_month": r_month,
-        "score": score_val,
-        "chapters": res.get("chapters", []),
+        "student_name": s_name, "school_name": sch_name, "student_grade": s_grade,
+        "report_month": r_month, "score": score_val, "chapters": res.get("chapters", []),
         "difficulty_analysis": res.get("difficulty_analysis", {"하": "0", "중하": "0", "중": "0", "상": "0", "최상": "0"}),
         "mastery_types": res.get("mastery_types", [])[:3],
         "weakness_types": res.get("weakness_types", [])[:3],
@@ -217,34 +204,18 @@ if uploaded_file is not None:
     }
 
     st.markdown("---")
-    
-    # PDF 바이너리 리포트 생성
     pdf_bin = create_academy_report(final_data)
 
-    # 좌우 2분할 레이아웃 배치
     left_col, right_col = st.columns([1, 1.2])
     
     with left_col:
         st.markdown("### 🖨️ 3단계: 성적표 결과지 발행")
-        st.success("🎉 분석지 생성이 완료되었습니다. 아래 버튼을 눌러 소장하세요!")
-        st.download_button(
-            label="💾 코넬수학 진단평가 결과지 PDF 다운로드",
-            data=pdf_bin,
-            file_name=f"코넬수학_진단결과분석지_{s_name}.pdf",
-            mime="application/pdf",
-            type="primary"
-        )
+        st.download_button("💾 PDF 다운로드", data=pdf_bin, file_name=f"코넬수학_{s_name}.pdf", mime="application/pdf", type="primary")
         
-with right_col:
-        st.markdown("### 🔍 발급 예정 결과지 미리보기")
-        
-        # 디자인 컨테이너 시작
+    with right_col:
+        st.markdown("### 🔍 결과지 미리보기")
         st.markdown('<div class="pdf-preview-container">', unsafe_allow_html=True)
-        
-        # 가장 안정적인 base64 임베딩 방식으로 강제 렌더링
         import base64
-        base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px" type="application/pdf"></iframe>'
-        st.markdown(pdf_display, unsafe_allow_html=True)
-            
+        b64 = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
+        st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="800px"></iframe>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
