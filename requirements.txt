@@ -1,7 +1,8 @@
 streamlit
-pypdf
+pypdf # 기존 라이브러리 (삭제 안 함)
 openai
 reportlab
 streamlit-pdf-viewer
+# --- 아래 두 개 추가 ---
 pdf2image
 pillow
