@@ -216,7 +216,6 @@ def create_academy_report(data):
     story.append(drawing)
     story.append(Spacer(1, 15))
 
-    # [위치 교정 완료] 대표 우수/취약 유형 2열 3개식 배치를 코멘트 상단으로 이동
     mastery_content = [Paragraph("<b>■ 대표 우수 유형</b>", section_style), Spacer(1, 6)]
     mastery_list = data.get("mastery_types", [])
     if not mastery_list:
@@ -248,7 +247,7 @@ def create_academy_report(data):
     story.append(type_table)
     story.append(Spacer(1, 15))
 
-    # [위치 교정 완료] 분석 코멘트 상자를 가장 하단 피날레 배치
+    # [코멘트 상자 최하단 최종 피날레 배치 완료]
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
@@ -275,9 +274,9 @@ def create_academy_report(data):
     buffer.seek(0)
     return buffer
     # ====================================================================
-# 메인 UI 대시보드 및 동적 정렬 연동 복구 제어 영역
+# [완벽 복구] 메인 UI 대시보드 및 입력 수정창 연동 제어 영역
 # ====================================================================
-st.title("📊 코넬수학전문학원 레벨테스트 결과지 시스템")
+st.title("📊 코넬수학 레벨테스트 결과지 시스템")
 st.markdown("매쓰플랫 PDF를 정밀 분석하여 공식 신규생 진단 결과지를 발행합니다.")
 st.markdown("---")
 
@@ -319,7 +318,7 @@ if uploaded_file is not None:
 
     res = st.session_state["ocr_result"]
 
-    # 기본 검토 패널 구성 (불필요한 2단계 점수입력창 전면 생량 처리)
+    # [복구 완해] 1단계: 학생 정보 검토 및 수정창 활성화
     st.markdown("### 📋 1단계: 기본 정보 검토 및 수정")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -335,10 +334,11 @@ if uploaded_file is not None:
     with col5:
         score_val = st.text_input("종합 점수", value=str(res.get("score", "")))
 
+    # [복구 완해] 2단계: 종합 코멘트 실시간 수정 관리 영역 활성화
     st.markdown("### 🦅 2단계: 종합 코멘트 관리")
     teacher_comment = st.text_area("코넬 분석 Comment", value=res.get("teacher_comment", ""), height=150)
 
-    # 파이썬 딕셔너리 안전 동기화 빌드
+    # 파이썬 데이터 사전 최종 바인딩
     final_data = {
         "student_name": s_name,
         "school_name": sch_name,
@@ -354,10 +354,10 @@ if uploaded_file is not None:
 
     st.markdown("---")
     
-    # [정렬 교정 핵심] 분할 레이아웃 실행 직전 PDF 데이터 바인딩을 먼저 끝내어 무조건 NameError 차단
+    # 레이아웃 나누기 직전 PDF 바이너리 데이터를 안전하게 우선 컴파일
     pdf_bin = create_academy_report(final_data)
 
-    # 화면 2분할 뷰 포트 가동
+    # 화면 2분할 레이아웃 배치
     left_col, right_col = st.columns([1, 1.2])
     
     with left_col:
@@ -377,9 +377,9 @@ if uploaded_file is not None:
         # 고급 명품 액자 테두리 컨테이너 선언
         st.markdown('<div class="pdf-preview-container">', unsafe_allow_html=True)
         try:
-            # 완벽한 범용 호환성을 보장하는 최적화 iframe 인베딩 디스플레이 처리
+            # 브라우저별 차단 문제를 원천 우회하는 고해상도 HTML5 표준 object 인베딩 방식으로 전면 개정
             base64_pdf = base64.b64encode(pdf_bin.getvalue()).decode('utf-8')
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px" type="application/pdf"></iframe>'
+            pdf_display = f'<object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="800px"><iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px"></iframe></object>'
             st.markdown(pdf_display, unsafe_allow_html=True)
         except Exception as display_err:
             st.info("💡 실시간 미리보기를 불러오는 중입니다. 지연 발생 시 다운로드 버튼을 활용해 주세요.")
