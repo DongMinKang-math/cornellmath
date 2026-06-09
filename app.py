@@ -277,45 +277,45 @@ def create_academy_report(data):
 
     # === [신규 추가] 레벨 안내 표 생성 로직 ===
     from reportlab.lib.styles import ParagraphStyle
-        try:
-            score_val = int(''.join(filter(str.isdigit, str(data.get('종합 점수', '0')))))
-        except:
-            score_val = 0
+    try:
+        score_val = int(''.join(filter(str.isdigit, str(data.get('종합 점수', '0')))))
+    except:
+        score_val = 0
 
-        # 점수에 따른 행 강조 번호 설정 (A=1, B=2, C=3, D=4, F=5)
-        target_row = 5
-        if score_val >= 88: target_row = 1
-        elif score_val >= 72: target_row = 2
-        elif score_val >= 48: target_row = 3
-        elif score_val >= 20: target_row = 4
+    # 점수에 따른 행 강조 번호 설정 (A=1, B=2, C=3, D=4, F=5)
+    target_row = 5
+    if score_val >= 88: target_row = 1
+    elif score_val >= 72: target_row = 2
+    elif score_val >= 48: target_row = 3
+    elif score_val >= 20: target_row = 4
 
-        cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
-        cell_style_bold = ParagraphStyle('LvlCB', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13, alignment=1)
+    cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
+    cell_style_bold = ParagraphStyle('LvlCB', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13, alignment=1)
 
-        level_table_data = [
-            [Paragraph("<b>레벨</b>", cell_style_bold), Paragraph("<b>점수 구간</b>", cell_style_bold), Paragraph("<b>설명</b>", cell_style_bold)],
-            [Paragraph("A 레벨", cell_style_bold), Paragraph("100점 ~ 88점", cell_style_bold), Paragraph("고교 내신 1등급을 독점할 수 있는 실력이며, 서울대·연세대·고려대 및 의치한약수 합격을 정조준할 수 있는 최상위권입니다.", cell_style)],
-            [Paragraph("B 레벨", cell_style_bold), Paragraph("87점 ~ 72점", cell_style_bold), Paragraph("개념은 완벽하나 준킬러/킬러 문항에서 오답이 발생하는 단계로, 심화 유형만 정복하면 상위권으로 도약 가능합니다.", cell_style)],
-            [Paragraph("C 레벨", cell_style_bold), Paragraph("71점 ~ 48점", cell_style_bold), Paragraph("기본 유형은 해결하지만 응용·변형이 어려운 단계로, 무리한 고난도 문제 풀이보다는 기출 핵심 문항 분석에 집중하여 전략적 학습이 필요합니다.", cell_style)],
-            [Paragraph("D 레벨", cell_style_bold), Paragraph("47점 ~ 20점", cell_style_bold), Paragraph("개념을 응용하는 과정에서 벽에 부딪혔을 뿐이니, 교과서 개념과 필수 연산부터 재정비하여 '작은 성공'을 쌓아가며 자신감을 회복할 때입니다.", cell_style)],
-            [Paragraph("F 레벨", cell_style_bold), Paragraph("19점 이하", cell_style_bold), Paragraph("오늘 배운 개념 익히기, 예제 3개 스스로 풀기처럼 실현 가능한 하루 목표를 달성하며 수학과의 거리감을 좁혀가는 것이 최우선입니다.", cell_style)]
-        ]
+    level_table_data = [
+        [Paragraph("<b>레벨</b>", cell_style_bold), Paragraph("<b>점수 구간</b>", cell_style_bold), Paragraph("<b>설명</b>", cell_style_bold)],
+        [Paragraph("A 레벨", cell_style_bold), Paragraph("100점 ~ 88점", cell_style_bold), Paragraph("고교 내신 1등급을 독점할 수 있는 실력이며, 서울대·연세대·고려대 및 의치한약수 합격을 정조준할 수 있는 최상위권입니다.", cell_style)],
+        [Paragraph("B 레벨", cell_style_bold), Paragraph("87점 ~ 72점", cell_style_bold), Paragraph("개념은 완벽하나 준킬러/킬러 문항에서 오답이 발생하는 단계로, 심화 유형만 정복하면 상위권으로 도약 가능합니다.", cell_style)],
+        [Paragraph("C 레벨", cell_style_bold), Paragraph("71점 ~ 48점", cell_style_bold), Paragraph("기본 유형은 해결하지만 응용·변형이 어려운 단계로, 무리한 고난도 문제 풀이보다는 기출 핵심 문항 분석에 집중하여 전략적 학습이 필요합니다.", cell_style)],
+        [Paragraph("D 레벨", cell_style_bold), Paragraph("47점 ~ 20점", cell_style_bold), Paragraph("개념을 응용하는 과정에서 벽에 부딪혔을 뿐이니, 교과서 개념과 필수 연산부터 재정비하여 '작은 성공'을 쌓아가며 자신감을 회복할 때입니다.", cell_style)],
+        [Paragraph("F 레벨", cell_style_bold), Paragraph("19점 이하", cell_style_bold), Paragraph("오늘 배운 개념 익히기, 예제 3개 스스로 풀기처럼 실현 가능한 하루 목표를 달성하며 수학과의 거리감을 좁혀가는 것이 최우선입니다.", cell_style)]
+    ]
 
-        level_table_style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F3F0DF')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ])
-        # 학생 점수 레벨에만 하늘색 하이라이트 배경색 칠하기
-        level_table_style.add('BACKGROUND', (0, target_row), (-1, target_row), colors.HexColor('#D1E8FF'))
+    level_table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F3F0DF')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ])
+    # 학생 점수 레벨에만 하늘색 하이라이트 배경색 칠하기
+    level_table_style.add('BACKGROUND', (0, target_row), (-1, target_row), colors.HexColor('#D1E8FF'))
 
-        lvl_table = Table(level_table_data, colWidths=[60, 80, 375])
-        lvl_table.setStyle(level_table_style)
+    lvl_table = Table(level_table_data, colWidths=[60, 80, 375])
+    lvl_table.setStyle(level_table_style)
 
-        story.append(Spacer(1, 15))
-        story.append(lvl_table)
+    story.append(Spacer(1, 15))
+    story.append(lvl_table)
 
     def add_footer_logo(canvas, doc):
         canvas.saveState()
