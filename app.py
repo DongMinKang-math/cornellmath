@@ -290,20 +290,12 @@ def create_academy_report(data):
     story.append(Paragraph("<b>📋 코넬 레벨 진단</b>", level_title_style))
 
     # 2. 확실한 연동을 위해 점수와 레벨 텍스트를 모두 추출하여 분석
-    score_str = str(data.get('종합 점수', data.get('점수', '0')))
-    level_str = str(data.get('레벨', data.get('진단 레벨', data.get('종합 레벨', '')))).upper()
-
-    try:
-        score_val = int(''.join(filter(str.isdigit, score_str)))
-    except:
-        score_val = 0
-
-    # 레벨 알파벳이 포함되어 있거나, 점수 구간에 해당하면 강조 행(target_row) 지정
-    target_row = 5 # 기본값 F 레벨 (5번 행)
-    if 'A' in level_str or score_val >= 88: target_row = 1
-    elif 'B' in level_str or (72 <= score_val < 88): target_row = 2
-    elif 'C' in level_str or (48 <= score_val < 72): target_row = 3
-    elif 'D' in level_str or (20 <= score_val < 48): target_row = 4
+# 2. 1페이지와 완벽하게 동일한 레벨(computed_level) 변수를 재사용하여 100% 동기화
+        target_row = 5 # 기본값 F 레벨 (5번 행)
+        if computed_level == "A": target_row = 1
+        elif computed_level == "B": target_row = 2
+        elif computed_level == "C": target_row = 3
+        elif computed_level == "D": target_row = 4
 
     # 3. 표 내부 글자 스타일 정의
     cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
