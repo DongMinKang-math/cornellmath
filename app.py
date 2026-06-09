@@ -184,7 +184,7 @@ def create_academy_report(data):
 
     
     # -------------------------------------------------------------------------
-    story.append(PageBreak()
+    story.append(PageBreak())
     story.append(Paragraph("📊 난이도별 정답률 분석", section_style))
     story.append(Spacer(1, 15))
 
