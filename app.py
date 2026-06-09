@@ -41,7 +41,7 @@ def calculate_math_level(score_str):
     except:
         return "C"
 
-# PDF 성적표 생성 함수 (기존과 동일하되 UI 간소화에 맞게 조정)
+# PDF 성적표 생성 함수
 def create_academy_report(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=25, bottomMargin=40)
@@ -58,7 +58,8 @@ def create_academy_report(data):
         font_name = 'HeiseiMin-W3'
 
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=18, leading=22, alignment=1, textColor=colors.HexColor('#FFFFFF'))
+    # 2. 제목 서식 굵고 선명하게 변경 (fontSize 및 두께감 강화)
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName=font_name, fontSize=19, leading=24, alignment=1, textColor=colors.HexColor('#FFFFFF'))
     info_style = ParagraphStyle('InfoStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=12, alignment=2, textColor=colors.HexColor('#64748B'))
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, textColor=colors.HexColor('#1E293B'))
     body_center = ParagraphStyle('BodyCenter', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=14, alignment=1, textColor=colors.HexColor('#1E293B'))
@@ -72,8 +73,8 @@ def create_academy_report(data):
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1E3A8A')),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 10),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ('TOPPADDING', (0,0), (-1,-1), 12),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 12),
     ]))
     story.append(t_banner)
     story.append(Spacer(1, 6))
@@ -112,19 +113,20 @@ def create_academy_report(data):
     story.append(Paragraph("📈 단원별 성취 분석", section_style))
     story.append(Spacer(1, 4))
 
+    # 1. '영역별 성취 수준 성장 지표' 막대그래프 슬림화 및 고급화 디자인 변경
     def make_ch_bar_cell(pct_val):
         try: pct = min(100, max(0, int(pct_val)))
         except: pct = 0
-        w_filled = max(1, int(pct * 2.0))
-        w_empty = max(1, 200 - w_filled)
-        bar_table = Table([['', '']], colWidths=[w_filled, w_empty])
-        bar_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (0,0), colors.HexColor('#2563EB')),
-            ('BACKGROUND', (1,0), (1,0), colors.HexColor('#E2E8F0')),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
-            ('TOPPADDING', (0,0), (-1,-1), 2.5),
-        ]))
-        return bar_table
+        
+        # 높이 10px짜리 프리미엄 얇은 라운딩 바 드로잉 디자인
+        d = Drawing(200, 10)
+        # 연회색 백그라운드 트랙
+        d.add(Rect(0, 2, 200, 6, fillColor=colors.HexColor('#E2E8F0'), strokeColor=None, rx=3, ry=3))
+        # 활성화 성취도 바 (코넬 블루 메인컬러)
+        if pct > 0:
+            w_filled = max(2, int(pct * 2.0))
+            d.add(Rect(0, 2, w_filled, 6, fillColor=colors.HexColor('#2563EB'), strokeColor=None, rx=3, ry=3))
+        return d
 
     ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
     for ch in data.get("chapters", []):
@@ -175,8 +177,38 @@ def create_academy_report(data):
             drawing.add(Line(px, py, x, y, strokeColor=colors.HexColor('#1E3A8A'), strokeWidth=1.2))
             
     story.append(drawing)
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 14))
 
+    # 3. 대표 우수 유형 / 대표 취약 유형 섹션 추가 (코멘트 위쪽 삽입)
+    story.append(Paragraph("🎯 핵심 유형별 상세 진단 결과", section_style))
+    story.append(Spacer(1, 4))
+    
+    strong_list = data.get("strong_types", [])
+    weak_list = data.get("weak_types", [])
+    
+    strong_text = "<br/>".join([f"• {t}" for t in strong_list]) if strong_list else "• 분석된 우수 유형 정보가 없습니다."
+    weak_text = "<br/>".join([f"• {t}" for t in weak_list]) if weak_list else "• 분석된 취약 유형 정보가 없습니다."
+    
+    type_table_data = [
+        [Paragraph('<b>🦅 대표 우수 유형 (Strengths)</b>', body_style), Paragraph('<b>⚠️ 대표 취약 유형 (Weaknesses)</b>', body_style)],
+        [Paragraph(strong_text, body_style), Paragraph(weak_text, body_style)]
+    ]
+    t_types = Table(type_table_data, colWidths=[255, 260])
+    t_types.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#EFF6FF')), # 연한 우수 블루
+        ('BACKGROUND', (1,0), (1,0), colors.HexColor('#FEF2F2')), # 연한 취약 레드
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t_types)
+    story.append(Spacer(1, 14))
+
+    # 코넬 분석 코멘트 단락
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
     story.append(Spacer(1, 4))
     
@@ -216,11 +248,10 @@ if uploaded_file is not None:
     if 'parsed_data' not in st.session_state:
         with st.spinner("코넬 AI가 비전(Vision) 기술로 리포트를 정밀 판독하고 프리미엄 코멘트를 작성 중입니다..."):
             try:
-                # 1. PDF를 이미지로 변환 (pdf2image)
+                # 1. PDF를 이미지로 변환
                 pdf_bytes = uploaded_file.getvalue()
                 images = convert_from_bytes(pdf_bytes, dpi=200)
                 
-                # 2. 이미지를 Base64 인코딩하여 GPT-4o에 전달할 리스트 생성
                 base64_images = []
                 for img in images:
                     buffered = io.BytesIO()
@@ -230,16 +261,16 @@ if uploaded_file is not None:
 
                 client = OpenAI(api_key=api_key)
 
-                # 3. 프리미엄 톤앤매너 프롬프트 강화
+                # 3. 우수유형/취약유형 추출 조건이 고도화된 프롬프트
                 system_prompt = """
                 당신은 강남 대치동 및 목동의 최상위권 수학전문학원에서 신규생 입학 상담을 전담하는 '수석 교육 팀장(컨설턴트)'입니다.
-                제공된 매쓰플랫 PDF 이미지들을 정밀하게 분석하여 오차 없는 데이터를 추출하고, 다음 가이드라인에 따라 프리미엄 학부모 상담 코멘트를 작성하세요.
+                제공된 매쓰플랫 PDF 이미지들을 정밀하게 분석하여 오차 없는 데이터를 추출하고, 다음 가이드라인에 따라 프리미엄 학부모 상담 리포트용 구조화 데이터를 만드세요.
 
-                [프리미엄 상담 코멘트 작성 가이드라인]
-                1. 가벼운 칭찬이나 어색한 번역투("참 잘했습니다", "좋은 결과를 얻었습니다")는 절대 금지합니다.
-                2. 객관적이고 무게감 있는 학술적 어휘를 사용하세요. (예: "기본 개념의 뼈대가 견고하게 형성되어 있음", "특정 유형에서 조건 분석의 누수가 관찰됨", "학습 임계점 돌파가 필요함" 등)
-                3. 학생의 취약점을 날카롭게 분석한 뒤, 반드시 본원(코넬수학)의 '타이트한 밀착 개별 클리닉' 및 '무한 오답 제어 메커니즘'을 해결책으로 제시하세요.
-                4. 문체는 정중하면서도 확신에 찬 전문가의 어조(단정적인 문어체 혹은 하십시오체)를 유지하여 학부모에게 압도적인 신뢰감을 주어야 합니다. 총 4~5문장으로 작성하세요.
+                [추출 가이드라인 개정안]
+                - 제공된 이미지 중 '대표 우수 유형' 및 '대표 취약 유형' 란을 식별하여 문항 번호와 유형명을 세밀하게 추출해 JSON 배열에 채우십시오.
+                - 가벼운 칭찬이나 어색한 번역투("참 잘했습니다")는 절대 금지합니다.
+                - 객관적이고 무게감 있는 학술적 어휘를 사용하세요. (예: "기본 개념의 뼈대가 견고하게 형성되어 있음", "특정 유형에서 조건 분석의 누수가 관찰됨")
+                - 학생의 취약점을 날카롭게 분석한 뒤, 반드시 코넬수학의 '타이트한 밀착 개별 클리닉' 및 '무한 오답 제어 메커니즘'을 해결책으로 제시하세요.
 
                 [반드시 지켜야 할 응답 JSON 형식]
                 {
@@ -258,11 +289,12 @@ if uploaded_file is not None:
                     "중하": "숫자만",
                     "하": "숫자만"
                   },
+                  "strong_types": ["8번 명제가 참이 되도록 하는 미지수 구하기", "18번 ..."],
+                  "weak_types": ["11번 절댓값 기호를 포함한 절대부등식", "23번 ..."],
                   "teacher_comment": "교정된 프리미엄 상담 코멘트"
                 }
                 """
 
-                # 메시지 구성 (시스템 프롬프트 + 이미지들)
                 messages_content = [{"type": "text", "text": system_prompt}]
                 for b64_img in base64_images:
                     messages_content.append({
@@ -270,7 +302,6 @@ if uploaded_file is not None:
                         "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
                     })
 
-                # API 호출 (GPT-4o Vision 활용)
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
@@ -312,14 +343,22 @@ if uploaded_file is not None:
         report_month = st.text_input("시험 일자 (년/월/일)", value=res.get("report_month", ""))
         score = st.text_input("종합 점수 (원본 고정)", value=str(res.get("score", "0")), disabled=True)
         
-        # ❌ 기존 난이도별 정답률 확인 조율창 삭제 (자동 파싱 데이터 바로 사용)
-        
+        # UI 영역에 검토 및 수정이 가능하도록 추출된 유형 칸 배치
+        col_str, col_wek = st.columns(2)
+        with col_str:
+            strong_input = st.text_area("🦅 추출된 대표 우수 유형 (줄바꿈 구분)", value="\n".join(res.get("strong_types", [])), height=100)
+        with col_wek:
+            weak_input = st.text_area("⚠️ 추출된 대표 취약 유형 (줄바꿈 구분)", value="\n".join(res.get("weak_types", [])), height=100)
+
         teacher_comment = st.text_area("🦅 코넬 분석 Comment (프리미엄 컨설팅 스타일 초안 / 수정 가능)", value=res.get("teacher_comment", ""), height=150)
         
+        # 변경값 다시 매핑
         res["student_name"] = student_name
         res["school_name"] = school_name
         res["student_grade"] = student_grade
         res["report_month"] = report_month
+        res["strong_types"] = [x.strip() for x in strong_input.split("\n") if x.strip()]
+        res["weak_types"] = [x.strip() for x in weak_input.split("\n") if x.strip()]
         res["teacher_comment"] = teacher_comment
         
         try:
