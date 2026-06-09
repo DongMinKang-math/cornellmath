@@ -153,11 +153,36 @@ def create_academy_report(data):
     story.append(t_ch)
     story.append(Spacer(1, 12))
 
-# -------------------------------------------------------------------------
-    # [수정] 명칭 변경 및 1페이지 하단 공백을 채우기 위한 그래프 상하 길이 확대
-    # -------------------------------------------------------------------------
-# -------------------------------------------------------------------------
-    # [수정] 난이도별 정답률 분석 (데이터 폭주 오류 수정 및 상하 길이 1.5배 확대)
+    # 3. 대표 우수 유형 / 대표 취약 유형 섹션 추가 (코멘트 위쪽 삽입)
+    story.append(Paragraph("🎯 핵심 유형별 상세 진단 결과", section_style))
+    story.append(Spacer(1, 4))
+    
+    strong_list = data.get("strong_types", [])
+    weak_list = data.get("weak_types", [])
+    
+    strong_text = "<br/>".join([f"• {t}" for t in strong_list]) if strong_list else "• 분석된 우수 유형 정보가 없습니다."
+    weak_text = "<br/>".join([f"• {t}" for t in weak_list]) if weak_list else "• 분석된 취약 유형 정보가 없습니다."
+    
+    type_table_data = [
+        [Paragraph('<b>🦅 대표 우수 유형 (Strengths)</b>', body_style), Paragraph('<b>⚠️ 대표 취약 유형 (Weaknesses)</b>', body_style)],
+        [Paragraph(strong_text, body_style), Paragraph(weak_text, body_style)]
+    ]
+    t_types = Table(type_table_data, colWidths=[255, 260])
+    t_types.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#EFF6FF')), # 연한 우수 블루
+        ('BACKGROUND', (1,0), (1,0), colors.HexColor('#FEF2F2')), # 연한 취약 레드
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t_types)
+    story.append(Spacer(1, 14))
+
+    
     # -------------------------------------------------------------------------
     story.append(Paragraph("📊 난이도별 정답률 분석", section_style))
     story.append(Spacer(1, 15))
@@ -215,36 +240,6 @@ def create_academy_report(data):
             
     story.append(drawing)
     story.append(Spacer(1, 20))
-
-    # 3. 대표 우수 유형 / 대표 취약 유형 섹션 추가 (코멘트 위쪽 삽입)
-    story.append(Paragraph("🎯 핵심 유형별 상세 진단 결과", section_style))
-    story.append(Spacer(1, 4))
-    
-    strong_list = data.get("strong_types", [])
-    weak_list = data.get("weak_types", [])
-    
-    strong_text = "<br/>".join([f"• {t}" for t in strong_list]) if strong_list else "• 분석된 우수 유형 정보가 없습니다."
-    weak_text = "<br/>".join([f"• {t}" for t in weak_list]) if weak_list else "• 분석된 취약 유형 정보가 없습니다."
-    
-    type_table_data = [
-        [Paragraph('<b>🦅 대표 우수 유형 (Strengths)</b>', body_style), Paragraph('<b>⚠️ 대표 취약 유형 (Weaknesses)</b>', body_style)],
-        [Paragraph(strong_text, body_style), Paragraph(weak_text, body_style)]
-    ]
-    t_types = Table(type_table_data, colWidths=[255, 260])
-    t_types.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#EFF6FF')), # 연한 우수 블루
-        ('BACKGROUND', (1,0), (1,0), colors.HexColor('#FEF2F2')), # 연한 취약 레드
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F8FAFC')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('LEFTPADDING', (0,0), (-1,-1), 8),
-        ('RIGHTPADDING', (0,0), (-1,-1), 8),
-    ]))
-    story.append(t_types)
-    story.append(Spacer(1, 14))
-
     # 코넬 분석 코멘트 단락
 # -------------------------------------------------------------------------
     # [수정] 코멘트 글자 크기(fontSize) 및 줄 간격(leading) 확대 적용
