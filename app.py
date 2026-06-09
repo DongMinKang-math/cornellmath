@@ -282,7 +282,7 @@ if uploaded_file is not None:
                     response_format={"type": "json_object"}
                 )
                 
-                ai_raw_data = response.choices.message.content
+                ai_raw_data = response.choices[0].message.content
                 st.session_state['parsed_data'] = json.loads(ai_raw_data)
                 st.success("🎉 코넬 대형학원 상담 멘트 최적화 및 수치 보정 완료!")
             except Exception as e:
