@@ -298,8 +298,8 @@ def create_academy_report(data):
     elif computed_level == "D": target_row = 4
 
     # 3. 표 내부 글자 스타일 정의
-cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
-cell_style_bold = ParagraphStyle('LvlCB', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13, alignment=1)
+    cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
+    cell_style_bold = ParagraphStyle('LvlCB', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13, alignment=1)
     # 4. 표 데이터 구성
     level_table_data = [
         [Paragraph("<b>레벨</b>", cell_style_bold), Paragraph("<b>점수 구간</b>", cell_style_bold), Paragraph("<b>설명</b>", cell_style_bold)],
