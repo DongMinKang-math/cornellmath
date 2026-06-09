@@ -128,11 +128,19 @@ def create_academy_report(data):
             d.add(Rect(0, 2, w_filled, 6, fillColor=colors.HexColor('#2563EB'), strokeColor=None, rx=3, ry=3))
         return d
 
-    ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
+ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
     for ch in data.get("chapters", []):
         ach_clean = ''.join(filter(str.isdigit, str(ch.get('achievement', '0'))))
-        ch_rows.append([Paragraph(ch.get('name', ''), body_style), make_ch_bar_cell(ach_clean), Paragraph(f"{ach_clean}%", body_center)])
-    
+        
+        # 각 단원별 성취도 점수를 기반으로 알파벳 등급(A~F) 계산
+        ch_level = calculate_math_level(ach_clean)
+        
+        ch_rows.append([
+            Paragraph(ch.get('name', ''), body_style), 
+            make_ch_bar_cell(ach_clean), 
+            # 성취도 텍스트 오른쪽에 계산된 레벨 추가
+            Paragraph(f"{ach_clean}% ({ch_level})", body_center) 
+        ])    
     t_ch = Table(ch_rows, colWidths=w_ch)
     t_ch.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8FAFC')),
@@ -152,14 +160,31 @@ def create_academy_report(data):
     drawing = Drawing(515, 100)
     drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
     
-    for y_val in [25, 50, 75, 100]:
+for y_val in [25, 50, 75, 100]:
         y_pos = int(y_val * 0.8) + 10
         drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5, strokeDashArray=[2, 2]))
     
     levels = ["하", "중하", "중", "상", "최상"]
-    points = []
     x_coords = [45, 150, 257, 365, 470]
     
+    # ----------------------------------------------------
+    # [신규 추가] 회색 기준 성취도 배경선 (하:90, 중하:85, 중:75, 상:60, 최상:30)
+    # ----------------------------------------------------
+    baseline_vals = [90, 85, 75, 60, 30]
+    for i in range(len(baseline_vals)):
+        bx = x_coords[i]
+        by = int(baseline_vals[i] * 0.8) + 10
+        # 기준점 시각화 (연한 회색 원)
+        drawing.add(Circle(bx, by, 1.5, fillColor=colors.HexColor('#94A3B8'), strokeColor=None))
+        if i > 0:
+            pbx = x_coords[i-1]
+            pby = int(baseline_vals[i-1] * 0.8) + 10
+            # 기준선 연결 (연한 회색 점선)
+            drawing.add(Line(pbx, pby, bx, by, strokeColor=colors.HexColor('#CBD5E1'), strokeWidth=0.8, strokeDashArray=[3, 3]))
+    # ----------------------------------------------------
+
+    # 학생 실제 데이터를 그리는 기존 로직 시작 (배경선보다 위에 덮어씌워짐)
+    points = []
     for i, lvl in enumerate(levels):
         try: val = int(''.join(filter(str.isdigit, str(st_diff.get(lvl, '0')))))
         except: val = 0
