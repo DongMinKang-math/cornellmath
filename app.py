@@ -153,56 +153,59 @@ def create_academy_report(data):
     story.append(t_ch)
     story.append(Spacer(1, 12))
 
-    story.append(Paragraph("📊 문항 진단 난이도별 정답률 분석", section_style))
-    story.append(Spacer(1, 4))
+# -------------------------------------------------------------------------
+    # [수정] 명칭 변경 및 1페이지 하단 공백을 채우기 위한 그래프 상하 길이 확대
+    # -------------------------------------------------------------------------
+    story.append(Paragraph("📊 난이도별 정답률 분석", section_style))
+    story.append(Spacer(1, 12))  # 간격 소폭 확대
 
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
-    drawing = Drawing(515, 100)
-    drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
     
+    # 캔버스 높이를 100에서 160으로 과감하게 확대
+    drawing = Drawing(515, 160)
+    drawing.add(Rect(0, 0, 515, 160, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
+    
+    # 그리드 y축 간격 비율 조정 (기존 0.8 -> 1.3으로 확대하여 세로로 늘림)
     for y_val in [25, 50, 75, 100]:
-        y_pos = int(y_val * 0.8) + 10
+        y_pos = int(y_val * 1.3) + 15
         drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5, strokeDashArray=[2, 2]))
     
     levels = ["하", "중하", "중", "상", "최상"]
     x_coords = [45, 150, 257, 365, 470]
     
-    # ----------------------------------------------------
-    # [신규 추가] 회색 기준 성취도 배경선 (하:90, 중하:85, 중:75, 상:60, 최상:30)
-    # ----------------------------------------------------
+    # 배경에 깔릴 회색 기준 성취도선 (하:90, 중하:85, 중:75, 상:60, 최상:30)
     baseline_vals = [90, 85, 75, 60, 30]
     for i in range(len(baseline_vals)):
         bx = x_coords[i]
-        by = int(baseline_vals[i] * 0.8) + 10
-        # 기준점 시각화 (연한 회색 원)
+        by = int(baseline_vals[i] * 1.3) + 15
         drawing.add(Circle(bx, by, 1.5, fillColor=colors.HexColor('#94A3B8'), strokeColor=None))
         if i > 0:
             pbx = x_coords[i-1]
-            pby = int(baseline_vals[i-1] * 0.8) + 10
-            # 기준선 연결 (연한 회색 점선)
+            pby = int(baseline_vals[i-1] * 1.3) + 15
             drawing.add(Line(pbx, pby, bx, by, strokeColor=colors.HexColor('#CBD5E1'), strokeWidth=0.8, strokeDashArray=[3, 3]))
-    # ----------------------------------------------------
-
-    # 학생 실제 데이터를 그리는 기존 로직 시작 (배경선보다 위에 덮어씌워짐)
+            
+    # 학생 실제 데이터 매핑 (비율 1.3 적용)
     points = []
     for i, lvl in enumerate(levels):
-        try: val = int(''.join(filter(str.isdigit, str(st_diff.get(lvl, '0')))))
-        except: val = 0
-        val = min(100, max(0, val))
-        y_pos = int(val * 0.8) + 10
+        val_str = ''.join(filter(str.isdigit, str(st_diff.get(lvl, '0'))))
+        val = int(val_str) if val_str else 0
+        y_pos = int(val * 1.3) + 15
         points.append((x_coords[i], y_pos, val))
         
+        # 난이도 텍스트 라벨 배치
+        drawing.add(String(x_coords[i], 2, lvl, fontName=font_name, fontSize=9, textAnchor='middle', fillColor=colors.HexColor('#475569')))
+        
+    # 학생 점수 연결선 및 포인트 그리기
     for i in range(len(points)):
-        x, y, v = points[i]
-        drawing.add(String(x, 2, levels[i], fontName='CustomFont', fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#475569')))
-        drawing.add(String(x, y + 5, f"{v}%", fontName='CustomFont', fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#1E3A8A')))
-        drawing.add(Circle(x, y, 2.5, fillColor=colors.HexColor('#1E3A8A'), strokeColor=colors.HexColor('#FFFFFF'), strokeWidth=1))
+        cx, cy, cval = points[i]
+        drawing.add(Circle(cx, cy, 3, fillColor=colors.HexColor('#2563EB'), strokeColor=colors.HexColor('#2563EB')))
+        drawing.add(String(cx, cy + 6, f"{cval}%", fontName=font_name, fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#1E293B')))
         if i > 0:
             px, py, _ = points[i-1]
-            drawing.add(Line(px, py, x, y, strokeColor=colors.HexColor('#1E3A8A'), strokeWidth=1.2))
+            drawing.add(Line(px, py, cx, cy, strokeColor=colors.HexColor('#2563EB'), strokeWidth=2))
             
     story.append(drawing)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 15))
 
     # 3. 대표 우수 유형 / 대표 취약 유형 섹션 추가 (코멘트 위쪽 삽입)
     story.append(Paragraph("🎯 핵심 유형별 상세 진단 결과", section_style))
@@ -234,18 +237,36 @@ def create_academy_report(data):
     story.append(Spacer(1, 14))
 
     # 코넬 분석 코멘트 단락
+# -------------------------------------------------------------------------
+    # [수정] 코멘트 글자 크기(fontSize) 및 줄 간격(leading) 확대 적용
+    # -------------------------------------------------------------------------
     story.append(Paragraph("<b>🦅 코넬 분석 Comment</b>", section_style))
-    story.append(Spacer(1, 4))
+    story.append(Spacer(1, 8))
     
-    comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), body_style)]]
+    # 학부모 가독성을 극대화하기 위한 전용 고품격 스타일 생성
+    premium_comment_style = ParagraphStyle(
+        'PremiumComment',
+        parent=styles['Normal'],
+        fontName=font_name,
+        fontSize=10.5,       # 기존 9에서 10.5로 확대
+        leading=17,          # 글씨가 커진 만큼 줄 간격도 여유 있게 조정
+        textColor=colors.HexColor('#1E293B'),
+        alignment=4          # 양쪽 정렬(Justify)로 서류의 깔끔함 유지
+    )
+    
+    w_comment = [515]
+    # 위에서 정의한 premium_comment_style을 Paragraph에 적용
+    comment_box = [[Paragraph(data.get('teacher_comment', '').replace('\n', '<br/>'), premium_comment_style)]]
+    
     t_comment = Table(comment_box, colWidths=w_comment)
     t_comment.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,0), colors.HexColor('#F8FAFC')),
-        ('BOX', (0,0), (0,0), 1.5, colors.HexColor('#1E3A8A')),
-        ('TOPPADDING', (0,0), (0,0), 8),
-        ('BOTTOMPADDING', (0,0), (0,0), 8),
-        ('LEFTPADDING', (0,0), (0,0), 10),
-        ('RIGHTPADDING', (0,0), (0,0), 10),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('BORDER', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('TOPPADDING', (0,0), (-1,-1), 14),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 14),
+        ('LEFTPADDING', (0,0), (-1,-1), 14),
+        ('RIGHTPADDING', (0,0), (-1,-1), 14),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
     ]))
     story.append(t_comment)
 
