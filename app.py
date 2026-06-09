@@ -276,7 +276,6 @@ def create_academy_report(data):
     story.append(t_comment)
 
     # === [신규 추가] 레벨 안내 표 생성 로직 ===
-    from reportlab.lib.styles import ParagraphStyle
     try:
         score_val = int(''.join(filter(str.isdigit, str(data.get('종합 점수', '0')))))
     except:
