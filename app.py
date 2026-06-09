@@ -160,7 +160,7 @@ def create_academy_report(data):
     drawing = Drawing(515, 100)
     drawing.add(Rect(0, 0, 515, 100, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
     
-for y_val in [25, 50, 75, 100]:
+    for y_val in [25, 50, 75, 100]:
         y_pos = int(y_val * 0.8) + 10
         drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5, strokeDashArray=[2, 2]))
     
