@@ -128,7 +128,7 @@ def create_academy_report(data):
             d.add(Rect(0, 2, w_filled, 6, fillColor=colors.HexColor('#2563EB'), strokeColor=None, rx=3, ry=3))
         return d
 
-ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
+    ch_rows = [[Paragraph('<b>평가 진단 영역</b>', body_center), Paragraph('<b>영역별 성취 수준 성장 지표</b>', body_center), Paragraph('<b>성취도</b>', body_center)]]
     for ch in data.get("chapters", []):
         ach_clean = ''.join(filter(str.isdigit, str(ch.get('achievement', '0'))))
         
