@@ -291,15 +291,15 @@ def create_academy_report(data):
 
     # 2. 확실한 연동을 위해 점수와 레벨 텍스트를 모두 추출하여 분석
 # 2. 1페이지와 완벽하게 동일한 레벨(computed_level) 변수를 재사용하여 100% 동기화
-        target_row = 5 # 기본값 F 레벨 (5번 행)
-        if computed_level == "A": target_row = 1
-        elif computed_level == "B": target_row = 2
-        elif computed_level == "C": target_row = 3
-        elif computed_level == "D": target_row = 4
+    target_row = 5 # 기본값 F 레벨 (5번 행)
+    if computed_level == "A": target_row = 1
+    elif computed_level == "B": target_row = 2
+    elif computed_level == "C": target_row = 3
+    elif computed_level == "D": target_row = 4
 
     # 3. 표 내부 글자 스타일 정의
-    cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
-    cell_style_bold = ParagraphStyle('LvlCB', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13, alignment=1)
+cell_style = ParagraphStyle('LvlC', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13)
+cell_style_bold = ParagraphStyle('LvlCB', parent=styles['Normal'], fontName=font_name, fontSize=9, leading=13, alignment=1)
     # 4. 표 데이터 구성
     level_table_data = [
         [Paragraph("<b>레벨</b>", cell_style_bold), Paragraph("<b>점수 구간</b>", cell_style_bold), Paragraph("<b>설명</b>", cell_style_bold)],
