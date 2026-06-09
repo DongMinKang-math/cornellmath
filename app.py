@@ -156,56 +156,65 @@ def create_academy_report(data):
 # -------------------------------------------------------------------------
     # [수정] 명칭 변경 및 1페이지 하단 공백을 채우기 위한 그래프 상하 길이 확대
     # -------------------------------------------------------------------------
+# -------------------------------------------------------------------------
+    # [수정] 난이도별 정답률 분석 (데이터 폭주 오류 수정 및 상하 길이 1.5배 확대)
+    # -------------------------------------------------------------------------
     story.append(Paragraph("📊 난이도별 정답률 분석", section_style))
-    story.append(Spacer(1, 12))  # 간격 소폭 확대
+    story.append(Spacer(1, 15))
 
     st_diff = data.get("difficulty", {"최상": "0", "상": "0", "중": "0", "중하": "0", "하": "0"})
     
-    # 캔버스 높이를 100에서 160으로 과감하게 확대
-    drawing = Drawing(515, 160)
-    drawing.add(Rect(0, 0, 515, 160, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
+    # 1. 캔버스 높이를 160에서 240으로 1.5배 확대 (1페이지 하단 여백 채우기)
+    drawing = Drawing(515, 240)
+    drawing.add(Rect(0, 0, 515, 240, fillColor=colors.HexColor('#F8FAFC'), strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5))
     
-    # 그리드 y축 간격 비율 조정 (기존 0.8 -> 1.3으로 확대하여 세로로 늘림)
+    # 2. 그리드 간격 배율을 1.3에서 2.0으로 확대 (+ 하단 여백 20)
     for y_val in [25, 50, 75, 100]:
-        y_pos = int(y_val * 1.3) + 15
+        y_pos = int(y_val * 2.0) + 20
         drawing.add(Line(0, y_pos, 515, y_pos, strokeColor=colors.HexColor('#E2E8F0'), strokeWidth=0.5, strokeDashArray=[2, 2]))
     
     levels = ["하", "중하", "중", "상", "최상"]
     x_coords = [45, 150, 257, 365, 470]
     
-    # 배경에 깔릴 회색 기준 성취도선 (하:90, 중하:85, 중:75, 상:60, 최상:30)
+    # 회색 기준 성취도 배경선 처리 (배율 2.0 적용)
     baseline_vals = [90, 85, 75, 60, 30]
     for i in range(len(baseline_vals)):
         bx = x_coords[i]
-        by = int(baseline_vals[i] * 1.3) + 15
+        by = int(baseline_vals[i] * 2.0) + 20
         drawing.add(Circle(bx, by, 1.5, fillColor=colors.HexColor('#94A3B8'), strokeColor=None))
         if i > 0:
             pbx = x_coords[i-1]
-            pby = int(baseline_vals[i-1] * 1.3) + 15
+            pby = int(baseline_vals[i-1] * 2.0) + 20
             drawing.add(Line(pbx, pby, bx, by, strokeColor=colors.HexColor('#CBD5E1'), strokeWidth=0.8, strokeDashArray=[3, 3]))
             
-    # 학생 실제 데이터 매핑 (비율 1.3 적용)
+    # 학생 실제 데이터 매핑
     points = []
     for i, lvl in enumerate(levels):
         val_str = ''.join(filter(str.isdigit, str(st_diff.get(lvl, '0'))))
         val = int(val_str) if val_str else 0
-        y_pos = int(val * 1.3) + 15
+        
+        # ★ 핵심 오류 수정: AI가 추출한 숫자가 100을 초과하더라도 100으로 고정하여 그래프 이탈 원천 차단
+        val = min(val, 100) 
+        
+        # 학생 점수 높이 계산 (배율 2.0 적용)
+        y_pos = int(val * 2.0) + 20
         points.append((x_coords[i], y_pos, val))
         
-        # 난이도 텍스트 라벨 배치
-        drawing.add(String(x_coords[i], 2, lvl, fontName=font_name, fontSize=9, textAnchor='middle', fillColor=colors.HexColor('#475569')))
+        # 하단 난이도 라벨 (하, 중하, 중, 상, 최상)
+        drawing.add(String(x_coords[i], 6, lvl, fontName=font_name, fontSize=10, textAnchor='middle', fillColor=colors.HexColor('#475569')))
         
     # 학생 점수 연결선 및 포인트 그리기
     for i in range(len(points)):
         cx, cy, cval = points[i]
         drawing.add(Circle(cx, cy, 3, fillColor=colors.HexColor('#2563EB'), strokeColor=colors.HexColor('#2563EB')))
-        drawing.add(String(cx, cy + 6, f"{cval}%", fontName=font_name, fontSize=8, textAnchor='middle', fillColor=colors.HexColor('#1E293B')))
+        # 점수 텍스트 표시 위치 조정
+        drawing.add(String(cx, cy + 8, f"{cval}%", fontName=font_name, fontSize=9, textAnchor='middle', fillColor=colors.HexColor('#1E293B')))
         if i > 0:
             px, py, _ = points[i-1]
             drawing.add(Line(px, py, cx, cy, strokeColor=colors.HexColor('#2563EB'), strokeWidth=2))
             
     story.append(drawing)
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 20))
 
     # 3. 대표 우수 유형 / 대표 취약 유형 섹션 추가 (코멘트 위쪽 삽입)
     story.append(Paragraph("🎯 핵심 유형별 상세 진단 결과", section_style))
